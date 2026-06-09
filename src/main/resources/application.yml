@@ -1,0 +1,37 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/bookmate}
+    username: ${DB_USERNAME:bookmate}
+    password: ${DB_PASSWORD:bookmate}
+
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
+
+auth:
+  jwt:
+    secret: ${JWT_SECRET:bookmate-local-development-secret-change-me}
+    expiration-seconds: ${JWT_EXPIRATION_SECONDS:1209600}
+
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:false}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:false}
+    path: /docs
+    operations-sorter: method
+    tags-sorter: alpha
+
+app:
+  public-base-url: ${PUBLIC_BASE_URL:http://127.0.0.1:8080}
+  upload:
+    profile-image-dir: ${PROFILE_IMAGE_UPLOAD_DIR:uploads/profile-images}
