@@ -9,7 +9,8 @@ public record UserResponse(
         AuthProvider provider,
         String nickname,
         String profileImageUrl,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        boolean isPublic
 ) {
 
     public static UserResponse from(UserEntity user) {
@@ -19,7 +20,8 @@ public record UserResponse(
                 user.getProvider(),
                 user.getNickname(),
                 user.getProfileImageUrl(),
-                user.getCreatedAt()
+                user.getCreatedAt(),
+                user.isPublic()
         );
     }
 }

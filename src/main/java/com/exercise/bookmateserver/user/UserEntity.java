@@ -56,6 +56,9 @@ public class UserEntity {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "is_public", nullable = false, columnDefinition = "boolean default true")
+    private boolean isPublic = true;
+
     protected UserEntity() {
     }
 
@@ -83,9 +86,12 @@ public class UserEntity {
         return new UserEntity(email, null, AuthProvider.KAKAO, providerId, nickname, profileImageUrl);
     }
 
-    public void updateProfile(String nickname, String profileImageUrl) {
+    public void updateProfile(String nickname, String profileImageUrl, Boolean isPublic) {
         this.nickname = normalizeNickname(nickname);
         this.profileImageUrl = normalizeNullable(profileImageUrl);
+        if (isPublic != null) {
+            this.isPublic = isPublic;
+        }
     }
 
     public void updateKakaoProfile(String email, String nickname, String profileImageUrl) {
@@ -178,5 +184,9 @@ public class UserEntity {
 
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
+    }
+
+    public boolean isPublic() {
+        return isPublic;
     }
 }

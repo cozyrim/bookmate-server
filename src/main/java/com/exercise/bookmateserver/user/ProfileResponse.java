@@ -12,7 +12,8 @@ public record ProfileResponse(
         LocalDateTime createdAt,
         long togetherDays,
         long savedWordCount,
-        long readBookCount
+        long readBookCount,
+        boolean isPublic
 ) {
 
     public static ProfileResponse of(
@@ -30,7 +31,8 @@ public record ProfileResponse(
                 user.getCreatedAt(),
                 togetherDays,
                 savedWordCount,
-                readBookCount
+                readBookCount,
+                user.isPublic()
         );
     }
 }
