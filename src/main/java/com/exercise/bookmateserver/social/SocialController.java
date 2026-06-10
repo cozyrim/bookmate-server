@@ -10,15 +10,20 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.UUID;
+import com.exercise.bookmateserver.auth.CurrentUserResolver;
+import com.exercise.bookmateserver.user.UserEntity;
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/social/users")
 public class SocialController {
 
     private final SocialService socialService;
+    private final CurrentUserResolver currentUserResolver;
 
-    public SocialController(SocialService socialService) {
+    public SocialController(SocialService socialService, CurrentUserResolver currentUserResolver) {
         this.socialService = socialService;
+        this.currentUserResolver = currentUserResolver;
     }
 
     @GetMapping("/search")
@@ -37,5 +42,12 @@ public class SocialController {
     public ResponseEntity<List<BookResponse>> getPublicUserBooks(@PathVariable UUID userId) {
         List<BookResponse> books = socialService.getPublicUserBooks(userId);
         return ResponseEntity.ok(books);
+    }
+
+    @GetMapping("/random")
+    public ResponseEntity<PublicUserResponse> getRandomPublicUser(HttpServletRequest request) {
+        UserEntity user = currentUserResolver.get(request);
+        PublicUserResponse randomUser = socialService.getRandomPublicUser(user.getId());
+        return ResponseEntity.ok(randomUser);
     }
 }

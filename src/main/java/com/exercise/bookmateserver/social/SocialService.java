@@ -50,4 +50,10 @@ public class SocialService {
                 .map(BookResponse::from)
                 .collect(Collectors.toList());
     }
+
+    public PublicUserResponse getRandomPublicUser(UUID currentUserId) {
+        UserEntity randomUser = userRepository.findRandomPublicUserExcluding(currentUserId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No other public users found"));
+        return PublicUserResponse.from(randomUser);
+    }
 }
