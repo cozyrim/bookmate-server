@@ -13,7 +13,8 @@ public record ProfileResponse(
         long togetherDays,
         long savedWordCount,
         long readBookCount,
-        boolean isPublic
+        boolean isPublic,
+        String roomTheme
 ) {
 
     public static ProfileResponse of(
@@ -32,7 +33,8 @@ public record ProfileResponse(
                 togetherDays,
                 savedWordCount,
                 readBookCount,
-                user.isPublic()
+                user.isPublic(),
+                user.getRoomTheme()
         );
     }
 }

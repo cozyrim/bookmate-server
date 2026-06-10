@@ -10,7 +10,8 @@ public record UserResponse(
         String nickname,
         String profileImageUrl,
         LocalDateTime createdAt,
-        boolean isPublic
+        boolean isPublic,
+        String roomTheme
 ) {
 
     public static UserResponse from(UserEntity user) {
@@ -21,7 +22,8 @@ public record UserResponse(
                 user.getNickname(),
                 user.getProfileImageUrl(),
                 user.getCreatedAt(),
-                user.isPublic()
+                user.isPublic(),
+                user.getRoomTheme()
         );
     }
 }

@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 public record ProfileUpdateRequest(
         @NotBlank String nickname,
         String profileImageUrl,
-        Boolean isPublic
+        Boolean isPublic,
+        String roomTheme
 ) {
 }

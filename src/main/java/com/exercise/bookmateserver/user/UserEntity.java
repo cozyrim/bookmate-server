@@ -59,6 +59,9 @@ public class UserEntity {
     @Column(name = "is_public", nullable = false, columnDefinition = "boolean default true")
     private boolean isPublic = true;
 
+    @Column(name = "room_theme", nullable = false, columnDefinition = "varchar(255) default 'AppBackground'")
+    private String roomTheme = "AppBackground";
+
     protected UserEntity() {
     }
 
@@ -86,11 +89,14 @@ public class UserEntity {
         return new UserEntity(email, null, AuthProvider.KAKAO, providerId, nickname, profileImageUrl);
     }
 
-    public void updateProfile(String nickname, String profileImageUrl, Boolean isPublic) {
-        this.nickname = normalizeNickname(nickname);
+    public void updateProfile(String nickname, String profileImageUrl, boolean isPublic, String roomTheme) {
+        if (nickname != null && !nickname.isBlank()) {
+            this.nickname = normalizeNickname(nickname);
+        }
         this.profileImageUrl = normalizeNullable(profileImageUrl);
-        if (isPublic != null) {
-            this.isPublic = isPublic;
+        this.isPublic = isPublic;
+        if (roomTheme != null && !roomTheme.isBlank()) {
+            this.roomTheme = roomTheme;
         }
     }
 
@@ -188,5 +194,9 @@ public class UserEntity {
 
     public boolean isPublic() {
         return isPublic;
+    }
+
+    public String getRoomTheme() {
+        return roomTheme;
     }
 }

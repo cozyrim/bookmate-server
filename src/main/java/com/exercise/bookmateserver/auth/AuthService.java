@@ -98,7 +98,7 @@ public class AuthService {
 
     @Transactional
     public ProfileResponse updateProfile(UserEntity user, ProfileUpdateRequest request) {
-        user.updateProfile(request.nickname(), request.profileImageUrl(), request.isPublic());
+        user.updateProfile(request.nickname(), request.profileImageUrl(), request.isPublic(), request.roomTheme());
         UserEntity savedUser = userRepository.saveAndFlush(user);
         return createProfileResponse(savedUser);
     }
