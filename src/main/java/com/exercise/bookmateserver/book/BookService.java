@@ -1,6 +1,7 @@
 package com.exercise.bookmateserver.book;
 
 import com.exercise.bookmateserver.quote.QuoteRepository;
+import com.exercise.bookmateserver.review.ReviewRepository;
 import com.exercise.bookmateserver.word.WordRepository;
 import com.exercise.bookmateserver.user.UserEntity;
 import org.springframework.http.HttpStatus;
@@ -18,12 +19,20 @@ public class BookService {
     private final BookRepository bookRepository;
     private final WordRepository wordRepository;
     private final QuoteRepository quoteRepository;
+    private final ReviewRepository reviewRepository;
     private final com.exercise.bookmateserver.readingmemo.ReadingMemoRepository readingMemoRepository;
 
-    public BookService(BookRepository bookRepository, WordRepository wordRepository, QuoteRepository quoteRepository, com.exercise.bookmateserver.readingmemo.ReadingMemoRepository readingMemoRepository) {
+    public BookService(
+            BookRepository bookRepository,
+            WordRepository wordRepository,
+            QuoteRepository quoteRepository,
+            ReviewRepository reviewRepository,
+            com.exercise.bookmateserver.readingmemo.ReadingMemoRepository readingMemoRepository
+    ) {
         this.bookRepository = bookRepository;
         this.wordRepository = wordRepository;
         this.quoteRepository = quoteRepository;
+        this.reviewRepository = reviewRepository;
         this.readingMemoRepository = readingMemoRepository;
     }
 
@@ -96,6 +105,7 @@ public class BookService {
 
         wordRepository.deleteByBookIdAndUserId(bookId, user.getId());
         quoteRepository.deleteByBookIdAndUserId(bookId, user.getId());  // 구절도 함께 삭제
+        reviewRepository.deleteByBookIdAndUserId(bookId, user.getId()); // 리뷰도 함께 삭제
         readingMemoRepository.deleteByBookIdAndUserId(bookId, user.getId()); // 메모도 함께 삭제
         bookRepository.delete(book);
     }

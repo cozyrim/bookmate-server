@@ -1,6 +1,7 @@
 package com.exercise.bookmateserver.auth;
 
 import com.exercise.bookmateserver.book.BookRepository;
+import com.exercise.bookmateserver.review.ReviewRepository;
 import com.exercise.bookmateserver.user.AuthProvider;
 import com.exercise.bookmateserver.user.ProfileResponse;
 import com.exercise.bookmateserver.user.ProfileUpdateRequest;
@@ -24,6 +25,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final BookRepository bookRepository;
     private final WordRepository wordRepository;
+    private final ReviewRepository reviewRepository;
     private final KakaoClient kakaoClient;
     private final TokenService tokenService;
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
@@ -32,12 +34,14 @@ public class AuthService {
             UserRepository userRepository,
             BookRepository bookRepository,
             WordRepository wordRepository,
+            ReviewRepository reviewRepository,
             KakaoClient kakaoClient,
             TokenService tokenService
     ) {
         this.userRepository = userRepository;
         this.bookRepository = bookRepository;
         this.wordRepository = wordRepository;
+        this.reviewRepository = reviewRepository;
         this.kakaoClient = kakaoClient;
         this.tokenService = tokenService;
     }
@@ -106,6 +110,7 @@ public class AuthService {
     @Transactional
     public void deleteAccount(UserEntity user) {
         wordRepository.deleteByUserId(user.getId());
+        reviewRepository.deleteByUserId(user.getId());
         bookRepository.deleteByUserId(user.getId());
         userRepository.delete(user);
     }
