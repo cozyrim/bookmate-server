@@ -11,6 +11,10 @@ public interface BookRepository extends JpaRepository<BookEntity, UUID> {
 
     List<BookEntity> findAllByUserIdOrderByCreatedAtDesc(UUID userId);
 
+    List<BookEntity> findAllByIsbn(String isbn);
+
+    List<BookEntity> findAllByTitleIgnoreCaseAndAuthorIgnoreCase(String title, String author);
+
     java.util.Optional<BookEntity> findByIdAndUserId(UUID id, UUID userId);
 
     long countByUserId(UUID userId);

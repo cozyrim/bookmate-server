@@ -8,6 +8,7 @@ public record BookResponse(
         String title,
         String author,
         String imageName,
+        String isbn,
         String category,
         Double progress,
         Integer totalPages,
@@ -26,6 +27,7 @@ public record BookResponse(
                 book.getTitle(),
                 book.getAuthor(),
                 book.getImageName(),
+                book.getIsbn(),
                 book.getCategory(),
                 book.getProgress(),
                 book.getTotalPages(),
@@ -39,4 +41,3 @@ public record BookResponse(
         );
     }
 }
-

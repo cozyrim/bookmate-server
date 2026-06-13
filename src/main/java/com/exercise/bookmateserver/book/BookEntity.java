@@ -33,6 +33,8 @@ public class BookEntity {
     @Column(nullable = false)
     private String imageName;
 
+    private String isbn;
+
     @Column(nullable = false)
     private Double progress;
 
@@ -65,6 +67,7 @@ public class BookEntity {
             String title,
             String author,
             String imageName,
+            String isbn,
             Double progress,
             String category,
             Integer totalPages,
@@ -74,6 +77,7 @@ public class BookEntity {
         this.title = title;
         this.author = author;
         this.imageName = imageName;
+        this.isbn = BookIsbnNormalizer.normalize(isbn);
         this.category = normalizeCategory(category);
         updateReadingProgress(progress, totalPages, currentPage);
     }
@@ -82,6 +86,7 @@ public class BookEntity {
             String title,
             String author,
             String imageName,
+            String isbn,
             Double progress,
             String category,
             Integer totalPages,
@@ -95,6 +100,9 @@ public class BookEntity {
         this.title = title;
         this.author = author;
         this.imageName = imageName;
+        if (isbn != null) {
+            this.isbn = BookIsbnNormalizer.normalize(isbn);
+        }
         this.category = normalizeCategory(category);
         updateReadingProgress(progress, totalPages, currentPage);
         this.rating = normalizeRating(rating);
@@ -180,6 +188,10 @@ public class BookEntity {
 
     public String getImageName() {
         return imageName;
+    }
+
+    public String getIsbn() {
+        return isbn;
     }
 
     public Double getProgress() {

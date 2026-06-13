@@ -10,6 +10,7 @@ public record BookCreateRequest(
         @NotBlank String title,
         @NotBlank String author,
         @NotBlank String imageName,
+        String isbn,
         String category,
 
         @NotNull

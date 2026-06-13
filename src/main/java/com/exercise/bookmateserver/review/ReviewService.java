@@ -1,5 +1,7 @@
 package com.exercise.bookmateserver.review;
 
+import com.exercise.bookmateserver.book.BookEntity;
+import com.exercise.bookmateserver.book.BookIsbnNormalizer;
 import com.exercise.bookmateserver.book.BookRepository;
 import com.exercise.bookmateserver.user.UserEntity;
 import com.exercise.bookmateserver.user.UserRepository;
@@ -11,6 +13,8 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -65,6 +69,36 @@ public class ReviewService {
         validateBookExists(bookId);
 
         List<ReviewEntity> reviews = reviewRepository.findAllByBookIdAndIsPublicTrueOrderByUpdatedAtDesc(bookId);
+        return toResponses(reviews);
+    }
+
+    public List<ReviewResponse> findPublicReviewsByBookIdentity(String isbn, String title, String author) {
+        Set<UUID> bookIds = new LinkedHashSet<>();
+        String normalizedIsbn = BookIsbnNormalizer.normalize(isbn);
+
+        if (normalizedIsbn != null) {
+            bookRepository.findAllByIsbn(normalizedIsbn)
+                    .stream()
+                    .map(BookEntity::getId)
+                    .forEach(bookIds::add);
+        }
+
+        if (bookIds.isEmpty() && hasText(title) && hasText(author)) {
+            bookRepository.findAllByTitleIgnoreCaseAndAuthorIgnoreCase(title.trim(), author.trim())
+                    .stream()
+                    .map(BookEntity::getId)
+                    .forEach(bookIds::add);
+        }
+
+        if (bookIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<ReviewEntity> reviews = reviewRepository.findAllByBookIdInAndIsPublicTrueOrderByUpdatedAtDesc(bookIds);
+        return toResponses(reviews);
+    }
+
+    private List<ReviewResponse> toResponses(List<ReviewEntity> reviews) {
         Map<UUID, UserEntity> owners = userRepository.findAllById(
                         reviews.stream()
                                 .map(ReviewEntity::getUserId)
@@ -93,6 +127,10 @@ public class ReviewService {
         if (!bookRepository.existsById(bookId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "책을 찾을 수 없습니다.");
         }
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private UserEntity findOwner(ReviewEntity review, Map<UUID, UserEntity> owners) {
