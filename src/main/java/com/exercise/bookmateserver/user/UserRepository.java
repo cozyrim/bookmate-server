@@ -13,12 +13,14 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
 
     boolean existsByEmail(String email);
 
+    boolean existsByNicknameIgnoreCase(String nickname);
+
     Optional<UserEntity> findByProviderAndProviderId(AuthProvider provider, String providerId);
 
     java.util.List<UserEntity> findByNicknameContainingIgnoreCaseAndIsPublicTrue(String nickname);
 
     Optional<UserEntity> findByIdAndIsPublicTrue(UUID id);
 
-    @Query(value = "SELECT * FROM users WHERE is_public = true AND id != :excludeId ORDER BY RANDOM() LIMIT 1", nativeQuery = true)
+    @Query(value = "SELECT * FROM app_users WHERE is_public = true AND id != :excludeId ORDER BY RANDOM() LIMIT 1", nativeQuery = true)
     Optional<UserEntity> findRandomPublicUserExcluding(@Param("excludeId") UUID excludeId);
 }

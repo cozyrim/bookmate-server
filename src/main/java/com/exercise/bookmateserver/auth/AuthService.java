@@ -28,6 +28,7 @@ public class AuthService {
     private final ReviewRepository reviewRepository;
     private final KakaoClient kakaoClient;
     private final TokenService tokenService;
+    private final NicknameGenerator nicknameGenerator;
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public AuthService(
@@ -36,7 +37,8 @@ public class AuthService {
             WordRepository wordRepository,
             ReviewRepository reviewRepository,
             KakaoClient kakaoClient,
-            TokenService tokenService
+            TokenService tokenService,
+            NicknameGenerator nicknameGenerator
     ) {
         this.userRepository = userRepository;
         this.bookRepository = bookRepository;
@@ -44,25 +46,37 @@ public class AuthService {
         this.reviewRepository = reviewRepository;
         this.kakaoClient = kakaoClient;
         this.tokenService = tokenService;
+        this.nicknameGenerator = nicknameGenerator;
     }
 
     @Transactional
     public AuthResponse signup(SignupRequest request) {
         String email = normalizeEmail(request.email());
+        String nickname = normalizeOptional(request.nickname());
 
         if (userRepository.existsByEmail(email)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 가입된 이메일입니다.");
         }
 
+        if (nickname == null) {
+            nickname = nicknameGenerator.generateUniqueNickname();
+        } else if (userRepository.existsByNicknameIgnoreCase(nickname)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다.");
+        }
+
         UserEntity user = UserEntity.createLocal(
                 email,
                 passwordEncoder.encode(request.password()),
-                request.nickname(),
+                nickname,
                 request.profileImageUrl()
         );
 
         UserEntity savedUser = userRepository.save(user);
         return AuthResponse.of(tokenService.createAccessToken(savedUser), savedUser);
+    }
+
+    public NicknameSuggestionResponse suggestNickname() {
+        return new NicknameSuggestionResponse(nicknameGenerator.generateUniqueNickname());
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -125,5 +139,13 @@ public class AuthService {
 
     private String normalizeEmail(String email) {
         return email.trim().toLowerCase();
+    }
+
+    private String normalizeOptional(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        return value.trim();
     }
 }

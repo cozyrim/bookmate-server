@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -19,11 +20,17 @@ public class AuthController {
         this.authService = authService;
     }
 
-    @Operation(summary = "이메일 회원가입", description = "이메일, 비밀번호, 닉네임으로 회원가입합니다.")
+    @Operation(summary = "이메일 회원가입", description = "이메일, 비밀번호로 회원가입합니다. 닉네임이 비어 있으면 서버에서 자동 생성합니다.")
     @PostMapping("/api/auth/signup")
     @ResponseStatus(HttpStatus.CREATED)
     public AuthResponse signup(@Valid @RequestBody SignupRequest request) {
         return authService.signup(request);
+    }
+
+    @Operation(summary = "랜덤 닉네임 추천", description = "아직 사용 중이지 않은 랜덤 닉네임을 추천합니다.")
+    @GetMapping("/api/auth/nickname-suggestion")
+    public NicknameSuggestionResponse suggestNickname() {
+        return authService.suggestNickname();
     }
 
     @Operation(summary = "이메일 로그인", description = "이메일과 비밀번호로 로그인합니다.")

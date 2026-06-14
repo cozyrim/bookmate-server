@@ -13,7 +13,6 @@ public record SignupRequest(
         @Size(min = 8)
         String password,
 
-        @NotBlank
         String nickname,
 
         String profileImageUrl
