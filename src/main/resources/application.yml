@@ -15,7 +15,7 @@ spring:
     show-sql: true
 
 server:
-  address: ${SERVER_ADDRESS:127.0.0.1}
+  address: ${SERVER_ADDRESS:0.0.0.0}
 
 auth:
   jwt:
