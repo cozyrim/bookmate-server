@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,6 +32,18 @@ public class AuthController {
     @GetMapping("/api/auth/nickname-suggestion")
     public NicknameSuggestionResponse suggestNickname() {
         return authService.suggestNickname();
+    }
+
+    @Operation(summary = "이메일 중복 확인", description = "이메일 형식과 가입 가능 여부를 확인합니다.")
+    @GetMapping("/api/auth/email-availability")
+    public EmailAvailabilityResponse checkEmailAvailability(@RequestParam String email) {
+        return authService.checkEmailAvailability(email);
+    }
+
+    @Operation(summary = "닉네임 중복 확인", description = "닉네임 길이와 중복 여부를 확인합니다.")
+    @GetMapping("/api/auth/nickname-availability")
+    public NicknameAvailabilityResponse checkNicknameAvailability(@RequestParam String nickname) {
+        return authService.checkNicknameAvailability(nickname);
     }
 
     @Operation(summary = "이메일 로그인", description = "이메일과 비밀번호로 로그인합니다.")

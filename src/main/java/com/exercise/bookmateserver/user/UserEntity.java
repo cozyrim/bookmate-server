@@ -1,5 +1,6 @@
 package com.exercise.bookmateserver.user;
 
+import com.exercise.bookmateserver.auth.NicknamePolicy;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -20,6 +21,7 @@ import java.util.UUID;
         name = "app_users",
         uniqueConstraints = {
                 @UniqueConstraint(name = "uk_app_users_email", columnNames = "email"),
+                @UniqueConstraint(name = "uk_app_users_nickname", columnNames = "nickname"),
                 @UniqueConstraint(name = "uk_app_users_provider_id", columnNames = {"provider", "provider_id"})
         }
 )
@@ -44,7 +46,7 @@ public class UserEntity {
     @Column(name = "provider_id")
     private String providerId;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = NicknamePolicy.MAX_LENGTH)
     private String nickname;
 
     @Column(name = "profile_image_url", columnDefinition = "TEXT")
@@ -141,11 +143,13 @@ public class UserEntity {
     }
 
     private String normalizeNickname(String nickname) {
-        if (nickname == null || nickname.isBlank()) {
+        String normalized = NicknamePolicy.normalize(nickname);
+        if (normalized == null) {
             return DEFAULT_NICKNAME;
         }
 
-        return nickname.trim();
+        NicknamePolicy.validate(normalized);
+        return normalized;
     }
 
     private String normalizeNullable(String value) {

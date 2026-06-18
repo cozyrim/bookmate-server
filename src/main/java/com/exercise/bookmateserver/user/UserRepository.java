@@ -15,6 +15,8 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
 
     boolean existsByNicknameIgnoreCase(String nickname);
 
+    boolean existsByNicknameIgnoreCaseAndIdNot(String nickname, UUID id);
+
     Optional<UserEntity> findByProviderAndProviderId(AuthProvider provider, String providerId);
 
     java.util.List<UserEntity> findByNicknameContainingIgnoreCaseAndIsPublicTrue(String nickname);

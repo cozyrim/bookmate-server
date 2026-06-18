@@ -5,7 +5,6 @@ import org.springframework.stereotype.Component;
 
 import java.security.SecureRandom;
 import java.util.List;
-import java.util.UUID;
 
 @Component
 public class NicknameGenerator {
@@ -21,7 +20,7 @@ public class NicknameGenerator {
             "별책"
     );
 
-    private static final int MAX_ATTEMPTS = 20;
+    private static final int MAX_ATTEMPTS = 100;
 
     private final UserRepository userRepository;
     private final SecureRandom random = new SecureRandom();
@@ -38,12 +37,16 @@ public class NicknameGenerator {
             }
         }
 
-        return "북메이트" + UUID.randomUUID().toString().substring(0, 6);
+        throw new IllegalStateException("사용 가능한 랜덤 닉네임을 생성하지 못했습니다.");
     }
 
     private String randomNickname() {
         String word = WORDS.get(random.nextInt(WORDS.size()));
         int number = random.nextInt(9000) + 1000;
-        return word + number;
+        String nickname = word + number;
+        if (NicknamePolicy.length(nickname) > NicknamePolicy.MAX_LENGTH) {
+            throw new IllegalStateException("랜덤 닉네임 규칙이 최대 길이를 초과했습니다.");
+        }
+        return nickname;
     }
 }

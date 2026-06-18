@@ -22,6 +22,13 @@ import java.time.temporal.ChronoUnit;
 @Transactional(readOnly = true)
 public class AuthService {
 
+    private static final String EMAIL_DUPLICATED_MESSAGE = "이미 가입된 이메일입니다.";
+    private static final String EMAIL_AVAILABLE_MESSAGE = "가입 가능한 이메일입니다.";
+    private static final String NICKNAME_REQUIRED_MESSAGE = "닉네임을 입력해주세요.";
+    private static final String NICKNAME_TOO_LONG_MESSAGE = "닉네임은 8자 이하로 입력해주세요.";
+    private static final String NICKNAME_DUPLICATED_MESSAGE = "이미 사용 중인 닉네임입니다.";
+    private static final String NICKNAME_AVAILABLE_MESSAGE = "사용 가능한 닉네임입니다.";
+
     private final UserRepository userRepository;
     private final BookRepository bookRepository;
     private final WordRepository wordRepository;
@@ -51,17 +58,16 @@ public class AuthService {
 
     @Transactional
     public AuthResponse signup(SignupRequest request) {
-        String email = normalizeEmail(request.email());
-        String nickname = normalizeOptional(request.nickname());
+        String email = EmailPolicy.normalize(request.email());
+        String nickname = NicknamePolicy.normalize(request.nickname());
 
-        if (userRepository.existsByEmail(email)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 가입된 이메일입니다.");
-        }
+        validateEmailAvailable(email);
+        validatePassword(request.password());
 
         if (nickname == null) {
             nickname = nicknameGenerator.generateUniqueNickname();
-        } else if (userRepository.existsByNicknameIgnoreCase(nickname)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다.");
+        } else {
+            validateNicknameAvailable(nickname);
         }
 
         UserEntity user = UserEntity.createLocal(
@@ -79,8 +85,48 @@ public class AuthService {
         return new NicknameSuggestionResponse(nicknameGenerator.generateUniqueNickname());
     }
 
+    public EmailAvailabilityResponse checkEmailAvailability(String requestedEmail) {
+        String email = EmailPolicy.normalize(requestedEmail);
+        if (email == null) {
+            return new EmailAvailabilityResponse("", false, "이메일을 입력해주세요.");
+        }
+
+        try {
+            EmailPolicy.validate(email);
+        } catch (IllegalArgumentException exception) {
+            return new EmailAvailabilityResponse(email, false, exception.getMessage());
+        }
+
+        boolean available = !userRepository.existsByEmail(email);
+        return new EmailAvailabilityResponse(
+                email,
+                available,
+                available ? EMAIL_AVAILABLE_MESSAGE : EMAIL_DUPLICATED_MESSAGE
+        );
+    }
+
+    public NicknameAvailabilityResponse checkNicknameAvailability(String requestedNickname) {
+        String nickname = NicknamePolicy.normalize(requestedNickname);
+        if (nickname == null) {
+            return new NicknameAvailabilityResponse("", false, NICKNAME_REQUIRED_MESSAGE);
+        }
+
+        try {
+            NicknamePolicy.validate(nickname);
+        } catch (IllegalArgumentException exception) {
+            return new NicknameAvailabilityResponse(nickname, false, exception.getMessage());
+        }
+
+        boolean available = !userRepository.existsByNicknameIgnoreCase(nickname);
+        return new NicknameAvailabilityResponse(
+                nickname,
+                available,
+                available ? NICKNAME_AVAILABLE_MESSAGE : NICKNAME_DUPLICATED_MESSAGE
+        );
+    }
+
     public AuthResponse login(LoginRequest request) {
-        UserEntity user = userRepository.findByEmail(normalizeEmail(request.email()))
+        UserEntity user = userRepository.findByEmail(EmailPolicy.normalize(request.email()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다."));
 
         if (user.getPasswordHash() == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
@@ -103,7 +149,7 @@ public class AuthService {
                 .orElseGet(() -> userRepository.save(UserEntity.createKakao(
                         kakaoUserInfo.providerId(),
                         kakaoUserInfo.email(),
-                        kakaoUserInfo.nickname(),
+                        resolveKakaoNickname(kakaoUserInfo.nickname()),
                         kakaoUserInfo.profileImageUrl()
                 )));
 
@@ -116,7 +162,10 @@ public class AuthService {
 
     @Transactional
     public ProfileResponse updateProfile(UserEntity user, ProfileUpdateRequest request) {
-        user.updateProfile(request.nickname(), request.profileImageUrl(), request.isPublic(), request.roomTheme());
+        String nickname = NicknamePolicy.normalize(request.nickname());
+        validateNicknameAvailableForUpdate(nickname, user);
+
+        user.updateProfile(nickname, request.profileImageUrl(), request.isPublic(), request.roomTheme());
         UserEntity savedUser = userRepository.saveAndFlush(user);
         return createProfileResponse(savedUser);
     }
@@ -137,15 +186,63 @@ public class AuthService {
         return ProfileResponse.of(user, togetherDays, savedWordCount, readBookCount);
     }
 
-    private String normalizeEmail(String email) {
-        return email.trim().toLowerCase();
-    }
-
-    private String normalizeOptional(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
+    private void validateEmailAvailable(String email) {
+        try {
+            EmailPolicy.validate(email);
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
         }
 
-        return value.trim();
+        if (userRepository.existsByEmail(email)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, EMAIL_DUPLICATED_MESSAGE);
+        }
+    }
+
+    private void validatePassword(String password) {
+        try {
+            PasswordPolicy.validate(password);
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+        }
+    }
+
+    private void validateNicknameAvailable(String nickname) {
+        try {
+            NicknamePolicy.validate(nickname);
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+        }
+
+        if (userRepository.existsByNicknameIgnoreCase(nickname)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, NICKNAME_DUPLICATED_MESSAGE);
+        }
+    }
+
+    private void validateNicknameAvailableForUpdate(String nickname, UserEntity user) {
+        try {
+            NicknamePolicy.validate(nickname);
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+        }
+
+        if (!nickname.equalsIgnoreCase(user.getNickname())
+                && userRepository.existsByNicknameIgnoreCaseAndIdNot(nickname, user.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, NICKNAME_DUPLICATED_MESSAGE);
+        }
+    }
+
+    private String resolveKakaoNickname(String requestedNickname) {
+        String nickname = NicknamePolicy.normalize(requestedNickname);
+        if (nickname == null || userRepository.existsByNicknameIgnoreCase(nickname)) {
+            return nicknameGenerator.generateUniqueNickname();
+        }
+
+        try {
+            NicknamePolicy.validate(nickname);
+        } catch (IllegalArgumentException exception) {
+            return nicknameGenerator.generateUniqueNickname();
+        }
+
+        return nickname;
     }
 }
