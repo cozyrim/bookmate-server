@@ -57,18 +57,21 @@ public class ReviewController {
 
     @Operation(summary = "공개 리뷰 조회", description = "bookId에 해당하는 공개 리뷰 목록을 최신 수정순으로 조회합니다.")
     @GetMapping("/api/books/{bookId}/reviews")
-    public List<ReviewResponse> findPublicReviews(@PathVariable UUID bookId) {
-        return reviewService.findPublicReviews(bookId);
+    public List<ReviewResponse> findPublicReviews(HttpServletRequest httpRequest, @PathVariable UUID bookId) {
+        UserEntity user = currentUserResolver.get(httpRequest);
+        return reviewService.findPublicReviews(user, bookId);
     }
 
     @Operation(summary = "책 검색용 공개 리뷰 조회", description = "ISBN 또는 제목/저자에 해당하는 책들의 공개 리뷰 목록을 최신 수정순으로 조회합니다.")
     @GetMapping("/api/reviews/public")
     public List<ReviewResponse> findPublicReviewsByBookIdentity(
+            HttpServletRequest httpRequest,
             @RequestParam(required = false) String isbn,
             @RequestParam(required = false) String title,
             @RequestParam(required = false) String author
     ) {
-        return reviewService.findPublicReviewsByBookIdentity(isbn, title, author);
+        UserEntity user = currentUserResolver.get(httpRequest);
+        return reviewService.findPublicReviewsByBookIdentity(user, isbn, title, author);
     }
 
     @Operation(summary = "내 리뷰 삭제", description = "bookId에 해당하는 내 리뷰를 삭제합니다.")

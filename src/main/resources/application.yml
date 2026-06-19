@@ -33,5 +33,7 @@ springdoc:
 
 app:
   public-base-url: ${PUBLIC_BASE_URL:http://127.0.0.1:8080}
+  moderation:
+    admin-secret: ${MODERATION_ADMIN_SECRET:}
   upload:
     profile-image-dir: ${PROFILE_IMAGE_UPLOAD_DIR:uploads/profile-images}

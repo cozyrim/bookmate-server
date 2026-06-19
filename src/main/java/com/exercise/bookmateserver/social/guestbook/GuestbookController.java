@@ -19,8 +19,11 @@ public class GuestbookController {
     }
 
     @GetMapping("/users/{userId}/guestbook")
-    public List<GuestbookMessageResponse> getMessages(@PathVariable UUID userId) {
-        return guestbookService.getMessages(userId);
+    public List<GuestbookMessageResponse> getMessages(
+            @RequestAttribute("currentUser") UserEntity currentUser,
+            @PathVariable UUID userId
+    ) {
+        return guestbookService.getMessages(currentUser, userId);
     }
 
     @PostMapping("/users/{userId}/guestbook")

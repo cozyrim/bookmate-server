@@ -3,6 +3,9 @@ package com.exercise.bookmateserver.review;
 import com.exercise.bookmateserver.book.BookEntity;
 import com.exercise.bookmateserver.book.BookIsbnNormalizer;
 import com.exercise.bookmateserver.book.BookRepository;
+import com.exercise.bookmateserver.moderation.ContentModerationContext;
+import com.exercise.bookmateserver.moderation.ModerationService;
+import com.exercise.bookmateserver.moderation.ModerationTargetType;
 import com.exercise.bookmateserver.user.UserEntity;
 import com.exercise.bookmateserver.user.UserRepository;
 import org.springframework.http.HttpStatus;
@@ -26,20 +29,26 @@ public class ReviewService {
     private final ReviewRepository reviewRepository;
     private final BookRepository bookRepository;
     private final UserRepository userRepository;
+    private final ModerationService moderationService;
 
     public ReviewService(
             ReviewRepository reviewRepository,
             BookRepository bookRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            ModerationService moderationService
     ) {
         this.reviewRepository = reviewRepository;
         this.bookRepository = bookRepository;
         this.userRepository = userRepository;
+        this.moderationService = moderationService;
     }
 
     @Transactional
     public ReviewResponse saveMyReview(UserEntity user, UUID bookId, ReviewSaveRequest request) {
         validateMyBook(user, bookId);
+        if (request.isPublic()) {
+            moderationService.validateContentAllowed(request.content(), ContentModerationContext.BOOK_REVIEW);
+        }
 
         ReviewEntity review = reviewRepository.findByBookIdAndUserId(bookId, user.getId())
                 .map(existingReview -> {
@@ -65,14 +74,19 @@ public class ReviewService {
                 .map(review -> ReviewResponse.from(review, user));
     }
 
-    public List<ReviewResponse> findPublicReviews(UUID bookId) {
+    public List<ReviewResponse> findPublicReviews(UserEntity viewer, UUID bookId) {
         validateBookExists(bookId);
 
         List<ReviewEntity> reviews = reviewRepository.findAllByBookIdAndIsPublicTrueOrderByUpdatedAtDesc(bookId);
-        return toResponses(reviews);
+        return toResponses(viewer, reviews);
     }
 
-    public List<ReviewResponse> findPublicReviewsByBookIdentity(String isbn, String title, String author) {
+    public List<ReviewResponse> findPublicReviewsByBookIdentity(
+            UserEntity viewer,
+            String isbn,
+            String title,
+            String author
+    ) {
         Set<UUID> bookIds = new LinkedHashSet<>();
         String normalizedIsbn = BookIsbnNormalizer.normalize(isbn);
 
@@ -95,19 +109,23 @@ public class ReviewService {
         }
 
         List<ReviewEntity> reviews = reviewRepository.findAllByBookIdInAndIsPublicTrueOrderByUpdatedAtDesc(bookIds);
-        return toResponses(reviews);
+        return toResponses(viewer, reviews);
     }
 
-    private List<ReviewResponse> toResponses(List<ReviewEntity> reviews) {
+    private List<ReviewResponse> toResponses(UserEntity viewer, List<ReviewEntity> reviews) {
+        List<ReviewEntity> visibleReviews = reviews.stream()
+                .filter(review -> isVisibleReview(viewer, review))
+                .toList();
+
         Map<UUID, UserEntity> owners = userRepository.findAllById(
-                        reviews.stream()
+                        visibleReviews.stream()
                                 .map(ReviewEntity::getUserId)
                                 .collect(Collectors.toSet())
                 )
                 .stream()
                 .collect(Collectors.toMap(UserEntity::getId, Function.identity()));
 
-        return reviews.stream()
+        return visibleReviews.stream()
                 .map(review -> ReviewResponse.from(review, findOwner(review, owners)))
                 .toList();
     }
@@ -140,5 +158,15 @@ public class ReviewService {
         }
 
         return owner;
+    }
+
+    private boolean isVisibleReview(UserEntity viewer, ReviewEntity review) {
+        UUID ownerId = review.getUserId();
+        return !moderationService.hasBlockBetween(viewer.getId(), ownerId)
+                && !moderationService.shouldHideTargetForUser(
+                viewer.getId(),
+                ModerationTargetType.PUBLIC_REVIEW,
+                review.getId().toString()
+        );
     }
 }

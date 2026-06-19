@@ -6,6 +6,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.List;
 
 public interface UserRepository extends JpaRepository<UserEntity, UUID> {
 
@@ -19,7 +20,9 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
 
     Optional<UserEntity> findByProviderAndProviderId(AuthProvider provider, String providerId);
 
-    java.util.List<UserEntity> findByNicknameContainingIgnoreCaseAndIsPublicTrue(String nickname);
+    List<UserEntity> findByNicknameContainingIgnoreCaseAndIsPublicTrue(String nickname);
+
+    List<UserEntity> findByIsPublicTrue();
 
     Optional<UserEntity> findByIdAndIsPublicTrue(UUID id);
 

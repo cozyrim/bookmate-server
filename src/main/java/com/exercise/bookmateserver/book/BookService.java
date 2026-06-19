@@ -4,6 +4,8 @@ import com.exercise.bookmateserver.quote.QuoteRepository;
 import com.exercise.bookmateserver.review.ReviewRepository;
 import com.exercise.bookmateserver.word.WordRepository;
 import com.exercise.bookmateserver.user.UserEntity;
+import com.exercise.bookmateserver.moderation.ContentModerationContext;
+import com.exercise.bookmateserver.moderation.ContentModerationPolicy;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,19 +23,22 @@ public class BookService {
     private final QuoteRepository quoteRepository;
     private final ReviewRepository reviewRepository;
     private final com.exercise.bookmateserver.readingmemo.ReadingMemoRepository readingMemoRepository;
+    private final ContentModerationPolicy contentModerationPolicy;
 
     public BookService(
             BookRepository bookRepository,
             WordRepository wordRepository,
             QuoteRepository quoteRepository,
             ReviewRepository reviewRepository,
-            com.exercise.bookmateserver.readingmemo.ReadingMemoRepository readingMemoRepository
+            com.exercise.bookmateserver.readingmemo.ReadingMemoRepository readingMemoRepository,
+            ContentModerationPolicy contentModerationPolicy
     ) {
         this.bookRepository = bookRepository;
         this.wordRepository = wordRepository;
         this.quoteRepository = quoteRepository;
         this.reviewRepository = reviewRepository;
         this.readingMemoRepository = readingMemoRepository;
+        this.contentModerationPolicy = contentModerationPolicy;
     }
 
     @Transactional
@@ -80,6 +85,8 @@ public class BookService {
     public BookResponse updateBook(UserEntity user, UUID bookId, BookUpdateRequest request) {
         BookEntity book = bookRepository.findByIdAndUserId(bookId, user.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "책을 찾을 수 없습니다."));
+
+        contentModerationPolicy.validateAllowed(request.review(), ContentModerationContext.BOOK_REVIEW);
 
         book.update(
                 request.title(),

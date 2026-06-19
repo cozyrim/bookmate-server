@@ -1,6 +1,9 @@
 package com.exercise.bookmateserver.auth;
 
 import com.exercise.bookmateserver.book.BookRepository;
+import com.exercise.bookmateserver.moderation.ContentModerationContext;
+import com.exercise.bookmateserver.moderation.ContentModerationPolicy;
+import com.exercise.bookmateserver.moderation.ModerationService;
 import com.exercise.bookmateserver.review.ReviewRepository;
 import com.exercise.bookmateserver.user.AuthProvider;
 import com.exercise.bookmateserver.user.ProfileResponse;
@@ -36,6 +39,8 @@ public class AuthService {
     private final KakaoClient kakaoClient;
     private final TokenService tokenService;
     private final NicknameGenerator nicknameGenerator;
+    private final ContentModerationPolicy contentModerationPolicy;
+    private final ModerationService moderationService;
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public AuthService(
@@ -45,7 +50,9 @@ public class AuthService {
             ReviewRepository reviewRepository,
             KakaoClient kakaoClient,
             TokenService tokenService,
-            NicknameGenerator nicknameGenerator
+            NicknameGenerator nicknameGenerator,
+            ContentModerationPolicy contentModerationPolicy,
+            ModerationService moderationService
     ) {
         this.userRepository = userRepository;
         this.bookRepository = bookRepository;
@@ -54,6 +61,8 @@ public class AuthService {
         this.kakaoClient = kakaoClient;
         this.tokenService = tokenService;
         this.nicknameGenerator = nicknameGenerator;
+        this.contentModerationPolicy = contentModerationPolicy;
+        this.moderationService = moderationService;
     }
 
     @Transactional
@@ -164,6 +173,7 @@ public class AuthService {
     public ProfileResponse updateProfile(UserEntity user, ProfileUpdateRequest request) {
         String nickname = NicknamePolicy.normalize(request.nickname());
         validateNicknameAvailableForUpdate(nickname, user);
+        contentModerationPolicy.validateAllowed(nickname, ContentModerationContext.PROFILE);
 
         user.updateProfile(nickname, request.profileImageUrl(), request.isPublic(), request.roomTheme());
         UserEntity savedUser = userRepository.saveAndFlush(user);
@@ -172,6 +182,7 @@ public class AuthService {
 
     @Transactional
     public void deleteAccount(UserEntity user) {
+        moderationService.deleteUserModerationData(user.getId());
         wordRepository.deleteByUserId(user.getId());
         reviewRepository.deleteByUserId(user.getId());
         bookRepository.deleteByUserId(user.getId());

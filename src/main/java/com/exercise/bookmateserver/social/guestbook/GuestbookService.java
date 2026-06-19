@@ -1,5 +1,8 @@
 package com.exercise.bookmateserver.social.guestbook;
 
+import com.exercise.bookmateserver.moderation.ContentModerationContext;
+import com.exercise.bookmateserver.moderation.ModerationService;
+import com.exercise.bookmateserver.moderation.ModerationTargetType;
 import com.exercise.bookmateserver.user.UserEntity;
 import com.exercise.bookmateserver.user.UserRepository;
 import org.springframework.http.HttpStatus;
@@ -17,18 +20,25 @@ public class GuestbookService {
 
     private final GuestbookRepository guestbookRepository;
     private final UserRepository userRepository;
+    private final ModerationService moderationService;
 
-    public GuestbookService(GuestbookRepository guestbookRepository, UserRepository userRepository) {
+    public GuestbookService(
+            GuestbookRepository guestbookRepository,
+            UserRepository userRepository,
+            ModerationService moderationService
+    ) {
         this.guestbookRepository = guestbookRepository;
         this.userRepository = userRepository;
+        this.moderationService = moderationService;
     }
 
-    public List<GuestbookMessageResponse> getMessages(UUID targetUserId) {
-        UserEntity targetUser = userRepository.findByIdAndIsPublicTrue(targetUserId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "공개된 사용자를 찾을 수 없습니다."));
+    public List<GuestbookMessageResponse> getMessages(UserEntity viewer, UUID targetUserId) {
+        UserEntity targetUser = findVisibleGuestbookOwner(viewer, targetUserId);
+        moderationService.ensureNoBlockBetween(viewer.getId(), targetUser.getId());
 
         return guestbookRepository.findAllByTargetUserIdOrderByCreatedAtDesc(targetUser.getId())
                 .stream()
+                .filter(message -> isVisibleMessage(viewer, message))
                 .map(GuestbookMessageResponse::from)
                 .collect(Collectors.toList());
     }
@@ -36,7 +46,10 @@ public class GuestbookService {
     @Transactional
     public GuestbookMessageResponse writeMessage(UserEntity writer, UUID targetUserId, GuestbookWriteRequest request) {
         UserEntity targetUser = userRepository.findByIdAndIsPublicTrue(targetUserId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "방명록을 남길 수 없는 사용자입니다."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "공개된 사용자를 찾을 수 없습니다."));
+
+        moderationService.ensureNoBlockBetween(writer.getId(), targetUser.getId());
+        moderationService.validateContentAllowed(request.content(), ContentModerationContext.GUESTBOOK);
 
         GuestbookEntity message = new GuestbookEntity(targetUser, writer, request.content());
         GuestbookEntity savedMessage = guestbookRepository.save(message);
@@ -57,5 +70,21 @@ public class GuestbookService {
         }
 
         guestbookRepository.delete(message);
+    }
+
+    private UserEntity findVisibleGuestbookOwner(UserEntity viewer, UUID targetUserId) {
+        return userRepository.findById(targetUserId)
+                .filter(targetUser -> targetUser.isPublic() || targetUser.getId().equals(viewer.getId()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "공개된 사용자를 찾을 수 없습니다."));
+    }
+
+    private boolean isVisibleMessage(UserEntity viewer, GuestbookEntity message) {
+        UUID writerId = message.getWriterUser().getId();
+        return !moderationService.hasBlockBetween(viewer.getId(), writerId)
+                && !moderationService.shouldHideTargetForUser(
+                viewer.getId(),
+                ModerationTargetType.GUESTBOOK_MESSAGE,
+                message.getId().toString()
+        );
     }
 }
