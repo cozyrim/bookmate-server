@@ -22,16 +22,23 @@ openssl rand -base64 48
 docker compose -f docker-compose.staging.yml --env-file .env.staging up -d --build
 ```
 
-4. Check the API:
+4. Check the API locally:
 
 ```sh
-curl http://127.0.0.1:8080/health
+curl http://127.0.0.1:18080/health
 ```
 
 The expected response is:
 
 ```txt
 OK
+```
+
+If `staging-api.bookmate.kr` points to this server and ports 80/443 are open,
+Caddy will proxy HTTPS traffic to the API:
+
+```sh
+curl https://staging-api.bookmate.kr/health
 ```
 
 5. View logs:
