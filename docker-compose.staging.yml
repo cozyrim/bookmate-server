@@ -1,0 +1,59 @@
+name: bookmate-staging
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: bookmate-api:staging
+    container_name: bookmate-staging-api
+    restart: unless-stopped
+    env_file:
+      - .env.staging
+    environment:
+      SPRING_PROFILES_ACTIVE: staging
+      SERVER_ADDRESS: 0.0.0.0
+      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      PROFILE_IMAGE_UPLOAD_DIR: /app/uploads/profile-images
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION_SECONDS: ${JWT_EXPIRATION_SECONDS:-1209600}
+      MODERATION_ADMIN_SECRET: ${MODERATION_ADMIN_SECRET:-}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    volumes:
+      - profile_images:/app/uploads/profile-images
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:8080/health | grep -q OK"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  db:
+    image: postgres:16-alpine
+    container_name: bookmate-staging-db
+    restart: unless-stopped
+    env_file:
+      - .env.staging
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  profile_images:
