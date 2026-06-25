@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -43,12 +44,28 @@ public class BookService {
 
     @Transactional
     public BookResponse createBook(UserEntity user, BookCreateRequest request) {
+        String title = normalizeRequiredText(request.title());
+        String author = normalizeRequiredText(request.author());
+        String imageName = normalizeRequiredText(request.imageName());
+        String normalizedIsbn = BookIsbnNormalizer.normalize(request.isbn());
+
+        Optional<BookEntity> existingBook = findExistingBook(
+                user.getId(),
+                normalizedIsbn,
+                title,
+                author
+        );
+
+        if (existingBook.isPresent()) {
+            return BookResponse.from(existingBook.get());
+        }
+
         BookEntity book = new BookEntity(
                 user.getId(),
-                request.title(),
-                request.author(),
-                request.imageName(),
-                request.isbn(),
+                title,
+                author,
+                imageName,
+                normalizedIsbn,
                 request.progress(),
                 request.category(),
                 request.totalPages(),
@@ -58,6 +75,42 @@ public class BookService {
         BookEntity savedBook = bookRepository.save(book);
 
         return BookResponse.from(savedBook);
+    }
+
+    private Optional<BookEntity> findExistingBook(UUID userId, String normalizedIsbn, String title, String author) {
+        if (normalizedIsbn != null && !normalizedIsbn.isBlank()) {
+            List<BookEntity> booksWithSameIsbn = bookRepository.findAllByUserIdAndIsbnOrderByCreatedAtDesc(
+                    userId,
+                    normalizedIsbn
+            );
+
+            if (!booksWithSameIsbn.isEmpty()) {
+                return Optional.of(booksWithSameIsbn.get(0));
+            }
+
+            return Optional.empty();
+        }
+
+        List<BookEntity> booksWithSameTitleAndAuthor =
+                bookRepository.findAllByUserIdAndTitleIgnoreCaseAndAuthorIgnoreCaseOrderByCreatedAtDesc(
+                        userId,
+                        title,
+                        author
+                );
+
+        if (!booksWithSameTitleAndAuthor.isEmpty()) {
+            return Optional.of(booksWithSameTitleAndAuthor.get(0));
+        }
+
+        return Optional.empty();
+    }
+
+    private String normalizeRequiredText(String value) {
+        if (value == null) {
+            return "";
+        }
+
+        return value.trim();
     }
 
     public List<BookResponse> findBooks() {
