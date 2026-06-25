@@ -1,0 +1,19 @@
+services:
+  api:
+    networks:
+      - default
+      - traefik_public_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_public_network"
+      - "traefik.http.routers.bookmate-staging.priority=100"
+      - "traefik.http.routers.bookmate-staging.entrypoints=websecure"
+      - "traefik.http.routers.bookmate-staging.rule=Host(`${STAGING_DOMAIN}`)"
+      - "traefik.http.routers.bookmate-staging.service=bookmate-staging"
+      - "traefik.http.routers.bookmate-staging.tls=true"
+      - "traefik.http.routers.bookmate-staging.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-myresolver}"
+      - "traefik.http.services.bookmate-staging.loadbalancer.server.port=8080"
+
+networks:
+  traefik_public_network:
+    external: true

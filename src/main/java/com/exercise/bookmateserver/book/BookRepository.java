@@ -3,6 +3,7 @@ package com.exercise.bookmateserver.book;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface BookRepository extends JpaRepository<BookEntity, UUID> {
@@ -15,7 +16,15 @@ public interface BookRepository extends JpaRepository<BookEntity, UUID> {
 
     List<BookEntity> findAllByTitleIgnoreCaseAndAuthorIgnoreCase(String title, String author);
 
-    java.util.Optional<BookEntity> findByIdAndUserId(UUID id, UUID userId);
+    List<BookEntity> findAllByUserIdAndIsbnOrderByCreatedAtDesc(UUID userId, String isbn);
+
+    List<BookEntity> findAllByUserIdAndTitleIgnoreCaseAndAuthorIgnoreCaseOrderByCreatedAtDesc(
+            UUID userId,
+            String title,
+            String author
+    );
+
+    Optional<BookEntity> findByIdAndUserId(UUID id, UUID userId);
 
     long countByUserId(UUID userId);
 
