@@ -66,6 +66,8 @@ public class AuthInterceptor implements HandlerInterceptor {
                 || path.startsWith("/api/reading-memos/")
                 || path.equals("/api/moderation")
                 || path.startsWith("/api/moderation/")
+                || path.equals("/api/notifications")
+                || path.startsWith("/api/notifications/")
                 || path.equals("/api/social")
                 || path.startsWith("/api/social/");
     }
