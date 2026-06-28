@@ -94,7 +94,7 @@ public class PushNotificationService {
 
         String writerNickname = writerUser.getNickname();
         sendToUser(targetUser.getId(), new PushNotificationPayload(
-                "서재에 새 방명록이 남았어요",
+                "서재에 새 방명록이 도착했어요",
                 writerNickname + "님이 방명록을 남겼어요.",
                 Map.of(
                         "type", "guestbook_message",
