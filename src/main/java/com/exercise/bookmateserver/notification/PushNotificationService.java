@@ -38,6 +38,7 @@ public class PushNotificationService {
     private static final String FIREBASE_APP_NAME = "bookmate-fcm";
 
     private final NotificationDeviceTokenRepository tokenRepository;
+    private final NotificationInboxService inboxService;
     private final boolean enabled;
     private final String serviceAccountJson;
     private final String serviceAccountPath;
@@ -46,11 +47,13 @@ public class PushNotificationService {
 
     public PushNotificationService(
             NotificationDeviceTokenRepository tokenRepository,
+            NotificationInboxService inboxService,
             @Value("${app.fcm.enabled:false}") boolean enabled,
             @Value("${app.fcm.service-account-json:}") String serviceAccountJson,
             @Value("${app.fcm.service-account-path:}") String serviceAccountPath
     ) {
         this.tokenRepository = tokenRepository;
+        this.inboxService = inboxService;
         this.enabled = enabled;
         this.serviceAccountJson = serviceAccountJson;
         this.serviceAccountPath = serviceAccountPath;
@@ -89,10 +92,22 @@ public class PushNotificationService {
             GuestbookEntity message
     ) {
         if (targetUser.getId().equals(writerUser.getId())) {
+            log.info(
+                    "Skipping guestbook push notification because writer and target are the same user. userId={} messageId={}",
+                    targetUser.getId(),
+                    message.getId()
+            );
             return;
         }
 
         String writerNickname = writerUser.getNickname();
+        log.info(
+                "Preparing guestbook push notification. targetUserId={} writerUserId={} messageId={}",
+                targetUser.getId(),
+                writerUser.getId(),
+                message.getId()
+        );
+
         sendToUser(targetUser.getId(), new PushNotificationPayload(
                 "서재에 새 방명록이 도착했어요",
                 writerNickname + "님이 방명록을 남겼어요.",
@@ -107,12 +122,19 @@ public class PushNotificationService {
 
     @Transactional
     public void sendToUser(UUID userId, PushNotificationPayload payload) {
+        inboxService.recordNotification(userId, payload);
+
         if (firebaseMessaging == null) {
             log.debug("Skipping push notification because FCM is not initialized. userId={}", userId);
             return;
         }
 
         List<NotificationDeviceTokenEntity> tokens = tokenRepository.findAllByUser_IdAndEnabledTrue(userId);
+        if (tokens.isEmpty()) {
+            log.info("No enabled push notification tokens found for user. userId={}", userId);
+            return;
+        }
+
         for (NotificationDeviceTokenEntity token : tokens) {
             sendToToken(token, payload);
         }
