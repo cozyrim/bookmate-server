@@ -3,6 +3,7 @@ package com.exercise.bookmateserver.social.guestbook;
 import com.exercise.bookmateserver.moderation.ContentModerationContext;
 import com.exercise.bookmateserver.moderation.ModerationService;
 import com.exercise.bookmateserver.moderation.ModerationTargetType;
+import com.exercise.bookmateserver.notification.PushNotificationService;
 import com.exercise.bookmateserver.user.UserEntity;
 import com.exercise.bookmateserver.user.UserRepository;
 import org.springframework.http.HttpStatus;
@@ -21,15 +22,18 @@ public class GuestbookService {
     private final GuestbookRepository guestbookRepository;
     private final UserRepository userRepository;
     private final ModerationService moderationService;
+    private final PushNotificationService pushNotificationService;
 
     public GuestbookService(
             GuestbookRepository guestbookRepository,
             UserRepository userRepository,
-            ModerationService moderationService
+            ModerationService moderationService,
+            PushNotificationService pushNotificationService
     ) {
         this.guestbookRepository = guestbookRepository;
         this.userRepository = userRepository;
         this.moderationService = moderationService;
+        this.pushNotificationService = pushNotificationService;
     }
 
     public List<GuestbookMessageResponse> getMessages(UserEntity viewer, UUID targetUserId) {
@@ -53,6 +57,7 @@ public class GuestbookService {
 
         GuestbookEntity message = new GuestbookEntity(targetUser, writer, request.content());
         GuestbookEntity savedMessage = guestbookRepository.save(message);
+        pushNotificationService.sendGuestbookMessageNotification(targetUser, writer, savedMessage);
 
         return GuestbookMessageResponse.from(savedMessage);
     }
