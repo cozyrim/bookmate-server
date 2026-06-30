@@ -25,6 +25,8 @@ import java.util.UUID;
 @Service
 public class ProfileImageStorageService {
 
+    private static final long MAX_PROFILE_IMAGE_SIZE_BYTES = 2L * 1024L * 1024L;
+
     private final Path uploadDirectory;
     private final String publicBaseUrl;
     private final boolean r2Enabled;
@@ -145,6 +147,10 @@ public class ProfileImageStorageService {
     private void validateImage(MultipartFile image) {
         if (image == null || image.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "업로드할 이미지가 필요합니다.");
+        }
+
+        if (image.getSize() > MAX_PROFILE_IMAGE_SIZE_BYTES) {
+            throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "프로필 이미지는 2MB 이하로 업로드해주세요.");
         }
 
         String contentType = image.getContentType();
