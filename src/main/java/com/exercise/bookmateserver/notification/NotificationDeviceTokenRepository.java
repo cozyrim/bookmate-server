@@ -13,4 +13,6 @@ public interface NotificationDeviceTokenRepository extends JpaRepository<Notific
     Optional<NotificationDeviceTokenEntity> findByUser_IdAndFcmToken(UUID userId, String fcmToken);
 
     List<NotificationDeviceTokenEntity> findAllByUser_IdAndEnabledTrue(UUID userId);
+
+    void deleteByUser_Id(UUID userId);
 }

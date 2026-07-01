@@ -4,7 +4,10 @@ import com.exercise.bookmateserver.book.BookRepository;
 import com.exercise.bookmateserver.moderation.ContentModerationContext;
 import com.exercise.bookmateserver.moderation.ContentModerationPolicy;
 import com.exercise.bookmateserver.moderation.ModerationService;
-import com.exercise.bookmateserver.review.ReviewRepository;
+import com.exercise.bookmateserver.notification.NotificationDeviceTokenRepository;
+import com.exercise.bookmateserver.notification.NotificationInboxRepository;
+import com.exercise.bookmateserver.quote.QuoteRepository;
+import com.exercise.bookmateserver.readingmemo.ReadingMemoRepository;
 import com.exercise.bookmateserver.user.AuthProvider;
 import com.exercise.bookmateserver.user.ProfileResponse;
 import com.exercise.bookmateserver.user.ProfileUpdateRequest;
@@ -20,6 +23,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.UUID;
 
 @Service
 @Transactional(readOnly = true)
@@ -35,7 +39,10 @@ public class AuthService {
     private final UserRepository userRepository;
     private final BookRepository bookRepository;
     private final WordRepository wordRepository;
-    private final ReviewRepository reviewRepository;
+    private final QuoteRepository quoteRepository;
+    private final ReadingMemoRepository readingMemoRepository;
+    private final NotificationDeviceTokenRepository notificationDeviceTokenRepository;
+    private final NotificationInboxRepository notificationInboxRepository;
     private final KakaoClient kakaoClient;
     private final TokenService tokenService;
     private final NicknameGenerator nicknameGenerator;
@@ -47,7 +54,10 @@ public class AuthService {
             UserRepository userRepository,
             BookRepository bookRepository,
             WordRepository wordRepository,
-            ReviewRepository reviewRepository,
+            QuoteRepository quoteRepository,
+            ReadingMemoRepository readingMemoRepository,
+            NotificationDeviceTokenRepository notificationDeviceTokenRepository,
+            NotificationInboxRepository notificationInboxRepository,
             KakaoClient kakaoClient,
             TokenService tokenService,
             NicknameGenerator nicknameGenerator,
@@ -57,7 +67,10 @@ public class AuthService {
         this.userRepository = userRepository;
         this.bookRepository = bookRepository;
         this.wordRepository = wordRepository;
-        this.reviewRepository = reviewRepository;
+        this.quoteRepository = quoteRepository;
+        this.readingMemoRepository = readingMemoRepository;
+        this.notificationDeviceTokenRepository = notificationDeviceTokenRepository;
+        this.notificationInboxRepository = notificationInboxRepository;
         this.kakaoClient = kakaoClient;
         this.tokenService = tokenService;
         this.nicknameGenerator = nicknameGenerator;
@@ -106,7 +119,7 @@ public class AuthService {
             return new EmailAvailabilityResponse(email, false, exception.getMessage());
         }
 
-        boolean available = !userRepository.existsByEmail(email);
+        boolean available = !userRepository.existsByEmailAndDeletedAtIsNull(email);
         return new EmailAvailabilityResponse(
                 email,
                 available,
@@ -135,7 +148,7 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest request) {
-        UserEntity user = userRepository.findByEmail(EmailPolicy.normalize(request.email()))
+        UserEntity user = userRepository.findByEmailAndDeletedAtIsNull(EmailPolicy.normalize(request.email()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다."));
 
         if (user.getPasswordHash() == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
@@ -150,7 +163,7 @@ public class AuthService {
         KakaoUserInfo kakaoUserInfo = kakaoClient.fetchUserInfo(request.accessToken());
 
         UserEntity user = userRepository
-                .findByProviderAndProviderId(AuthProvider.KAKAO, kakaoUserInfo.providerId())
+                .findByProviderAndProviderIdAndDeletedAtIsNull(AuthProvider.KAKAO, kakaoUserInfo.providerId())
                 .map(existingUser -> {
                     existingUser.updateKakaoAccountInfo(kakaoUserInfo.email());
                     return existingUser;
@@ -182,11 +195,16 @@ public class AuthService {
 
     @Transactional
     public void deleteAccount(UserEntity user) {
-        moderationService.deleteUserModerationData(user.getId());
-        wordRepository.deleteByUserId(user.getId());
-        reviewRepository.deleteByUserId(user.getId());
-        bookRepository.deleteByUserId(user.getId());
-        userRepository.delete(user);
+        UUID userId = user.getId();
+
+        notificationDeviceTokenRepository.deleteByUser_Id(userId);
+        notificationInboxRepository.deleteByUser_Id(userId);
+        moderationService.deleteUserModerationData(userId);
+        readingMemoRepository.deleteByUserId(userId);
+        quoteRepository.deleteByUserId(userId);
+        wordRepository.deleteByUserId(userId);
+        user.anonymizeForAccountDeletion();
+        userRepository.saveAndFlush(user);
     }
 
     private ProfileResponse createProfileResponse(UserEntity user) {
@@ -204,7 +222,7 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
         }
 
-        if (userRepository.existsByEmail(email)) {
+        if (userRepository.existsByEmailAndDeletedAtIsNull(email)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, EMAIL_DUPLICATED_MESSAGE);
         }
     }

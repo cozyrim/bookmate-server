@@ -49,7 +49,7 @@ public class GuestbookService {
 
     @Transactional
     public GuestbookMessageResponse writeMessage(UserEntity writer, UUID targetUserId, GuestbookWriteRequest request) {
-        UserEntity targetUser = userRepository.findByIdAndIsPublicTrue(targetUserId)
+        UserEntity targetUser = userRepository.findByIdAndIsPublicTrueAndDeletedAtIsNull(targetUserId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "공개된 사용자를 찾을 수 없습니다."));
 
         moderationService.ensureNoBlockBetween(writer.getId(), targetUser.getId());
@@ -79,6 +79,7 @@ public class GuestbookService {
 
     private UserEntity findVisibleGuestbookOwner(UserEntity viewer, UUID targetUserId) {
         return userRepository.findById(targetUserId)
+                .filter(targetUser -> !targetUser.isDeleted())
                 .filter(targetUser -> targetUser.isPublic() || targetUser.getId().equals(viewer.getId()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "공개된 사용자를 찾을 수 없습니다."));
     }

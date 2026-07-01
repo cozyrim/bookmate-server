@@ -39,6 +39,9 @@ public class AuthInterceptor implements HandlerInterceptor {
         UUID userId = tokenService.parseUserId(accessToken);
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "사용자 정보를 찾을 수 없습니다."));
+        if (user.isDeleted()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "탈퇴한 사용자입니다.");
+        }
 
         request.setAttribute(CURRENT_USER_ATTRIBUTE, user);
         return true;

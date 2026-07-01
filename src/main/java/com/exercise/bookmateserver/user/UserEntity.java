@@ -64,6 +64,9 @@ public class UserEntity {
     @Column(name = "room_theme", nullable = false, columnDefinition = "varchar(255) default 'AppBackground'")
     private String roomTheme = "AppBackground";
 
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     protected UserEntity() {
     }
 
@@ -120,6 +123,21 @@ public class UserEntity {
         if (this.email == null || this.email.isBlank()) {
             this.email = normalizeEmail(email);
         }
+    }
+
+    public void anonymizeForAccountDeletion() {
+        String suffix = id == null
+                ? UUID.randomUUID().toString().replace("-", "").substring(0, 6)
+                : id.toString().replace("-", "").substring(0, 6);
+
+        this.email = null;
+        this.passwordHash = null;
+        this.providerId = null;
+        this.nickname = "탈퇴" + suffix;
+        this.profileImageUrl = null;
+        this.isPublic = false;
+        this.roomTheme = "AppBackground";
+        this.deletedAt = LocalDateTime.now();
     }
 
     @PrePersist
@@ -202,5 +220,13 @@ public class UserEntity {
 
     public String getRoomTheme() {
         return roomTheme;
+    }
+
+    public LocalDateTime getDeletedAt() {
+        return deletedAt;
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
     }
 }

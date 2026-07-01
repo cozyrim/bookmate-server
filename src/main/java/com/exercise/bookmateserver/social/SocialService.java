@@ -36,7 +36,7 @@ public class SocialService {
         if (nickname == null || nickname.isBlank()) {
             return List.of();
         }
-        return userRepository.findByNicknameContainingIgnoreCaseAndIsPublicTrue(nickname)
+        return userRepository.findByNicknameContainingIgnoreCaseAndIsPublicTrueAndDeletedAtIsNull(nickname)
                 .stream()
                 .filter(candidate -> isVisiblePublicUser(viewer, candidate))
                 .map(PublicUserResponse::from)
@@ -44,14 +44,14 @@ public class SocialService {
     }
 
     public PublicUserResponse getPublicUserProfile(UserEntity viewer, UUID userId) {
-        UserEntity user = userRepository.findByIdAndIsPublicTrue(userId)
+        UserEntity user = userRepository.findByIdAndIsPublicTrueAndDeletedAtIsNull(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found or not public"));
         validateVisiblePublicUser(viewer, user, ModerationTargetType.PUBLIC_PROFILE);
         return PublicUserResponse.from(user);
     }
 
     public List<BookResponse> getPublicUserBooks(UserEntity viewer, UUID userId) {
-        UserEntity publicUser = userRepository.findByIdAndIsPublicTrue(userId)
+        UserEntity publicUser = userRepository.findByIdAndIsPublicTrueAndDeletedAtIsNull(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found or not public"));
         validateVisiblePublicUser(viewer, publicUser, ModerationTargetType.PUBLIC_BOOKSHELF);
 
@@ -67,7 +67,7 @@ public class SocialService {
     }
 
     public PublicUserResponse getRandomPublicUser(UserEntity viewer) {
-        List<UserEntity> candidates = userRepository.findByIsPublicTrue()
+        List<UserEntity> candidates = userRepository.findByIsPublicTrueAndDeletedAtIsNull()
                 .stream()
                 .filter(candidate -> !candidate.getId().equals(viewer.getId()))
                 .filter(candidate -> isVisiblePublicUser(viewer, candidate))

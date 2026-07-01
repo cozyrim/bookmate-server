@@ -15,4 +15,6 @@ public interface NotificationInboxRepository extends JpaRepository<NotificationI
     long countByUser_IdAndReadFalse(UUID userId);
 
     Optional<NotificationInboxEntity> findByIdAndUser_Id(UUID id, UUID userId);
+
+    void deleteByUser_Id(UUID userId);
 }

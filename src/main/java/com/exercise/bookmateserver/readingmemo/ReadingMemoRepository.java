@@ -9,4 +9,5 @@ public interface ReadingMemoRepository extends JpaRepository<ReadingMemoEntity, 
     List<ReadingMemoEntity> findAllByBookIdAndUserIdOrderByDateAscCreatedAtAsc(UUID bookId, UUID userId);
     Optional<ReadingMemoEntity> findByIdAndUserId(UUID id, UUID userId);
     void deleteByBookIdAndUserId(UUID bookId, UUID userId);
+    void deleteByUserId(UUID userId);
 }

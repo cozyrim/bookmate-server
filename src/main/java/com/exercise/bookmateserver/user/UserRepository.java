@@ -10,22 +10,22 @@ import java.util.List;
 
 public interface UserRepository extends JpaRepository<UserEntity, UUID> {
 
-    Optional<UserEntity> findByEmail(String email);
+    Optional<UserEntity> findByEmailAndDeletedAtIsNull(String email);
 
-    boolean existsByEmail(String email);
+    boolean existsByEmailAndDeletedAtIsNull(String email);
 
     boolean existsByNicknameIgnoreCase(String nickname);
 
     boolean existsByNicknameIgnoreCaseAndIdNot(String nickname, UUID id);
 
-    Optional<UserEntity> findByProviderAndProviderId(AuthProvider provider, String providerId);
+    Optional<UserEntity> findByProviderAndProviderIdAndDeletedAtIsNull(AuthProvider provider, String providerId);
 
-    List<UserEntity> findByNicknameContainingIgnoreCaseAndIsPublicTrue(String nickname);
+    List<UserEntity> findByNicknameContainingIgnoreCaseAndIsPublicTrueAndDeletedAtIsNull(String nickname);
 
-    List<UserEntity> findByIsPublicTrue();
+    List<UserEntity> findByIsPublicTrueAndDeletedAtIsNull();
 
-    Optional<UserEntity> findByIdAndIsPublicTrue(UUID id);
+    Optional<UserEntity> findByIdAndIsPublicTrueAndDeletedAtIsNull(UUID id);
 
-    @Query(value = "SELECT * FROM app_users WHERE is_public = true AND id != :excludeId ORDER BY RANDOM() LIMIT 1", nativeQuery = true)
+    @Query(value = "SELECT * FROM app_users WHERE is_public = true AND deleted_at IS NULL AND id != :excludeId ORDER BY RANDOM() LIMIT 1", nativeQuery = true)
     Optional<UserEntity> findRandomPublicUserExcluding(@Param("excludeId") UUID excludeId);
 }
