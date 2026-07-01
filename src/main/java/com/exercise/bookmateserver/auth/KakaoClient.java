@@ -15,7 +15,7 @@ import java.net.http.HttpResponse;
 @Component
 public class KakaoClient {
 
-    private static final URI KAKAO_USER_INFO_URI = URI.create("https://kapi.kakao.com/v2/user/me");
+    private static final URI KAKAO_USER_INFO_URI = URI.create("https://kapi.kakao.com/v2/user/me?secure_resource=true");
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final ObjectMapper objectMapper;

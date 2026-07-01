@@ -161,16 +161,21 @@ public class AuthService {
     @Transactional
     public AuthResponse loginWithKakao(KakaoLoginRequest request) {
         KakaoUserInfo kakaoUserInfo = kakaoClient.fetchUserInfo(request.accessToken());
+        String email = EmailPolicy.normalize(kakaoUserInfo.email());
 
         UserEntity user = userRepository
                 .findByProviderAndProviderIdAndDeletedAtIsNull(AuthProvider.KAKAO, kakaoUserInfo.providerId())
                 .map(existingUser -> {
-                    existingUser.updateKakaoAccountInfo(kakaoUserInfo.email());
+                    existingUser.updateKakaoProfile(
+                            email,
+                            resolveKakaoNickname(kakaoUserInfo.nickname()),
+                            kakaoUserInfo.profileImageUrl()
+                    );
                     return existingUser;
                 })
                 .orElseGet(() -> userRepository.save(UserEntity.createKakao(
                         kakaoUserInfo.providerId(),
-                        kakaoUserInfo.email(),
+                        email,
                         resolveKakaoNickname(kakaoUserInfo.nickname()),
                         kakaoUserInfo.profileImageUrl()
                 )));
