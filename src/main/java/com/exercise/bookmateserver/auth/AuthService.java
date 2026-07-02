@@ -169,7 +169,7 @@ public class AuthService {
     @Transactional
     public AuthResponse loginWithKakao(KakaoLoginRequest request) {
         KakaoUserInfo kakaoUserInfo = kakaoClient.fetchUserInfo(request.accessToken());
-        String email = EmailPolicy.normalize(kakaoUserInfo.email());
+        String email = availableSocialEmail(kakaoUserInfo.email());
 
         Optional<UserEntity> existingUser = userRepository
                 .findByProviderAndProviderIdAndDeletedAtIsNull(AuthProvider.KAKAO, kakaoUserInfo.providerId());
@@ -205,9 +205,9 @@ public class AuthService {
                 request.userIdentifier()
         );
 
-        String requestedEmail = EmailPolicy.normalize(request.email());
+        String requestedEmail = availableSocialEmail(request.email());
         String email = requestedEmail == null
-                ? EmailPolicy.normalize(appleUserInfo.email())
+                ? availableSocialEmail(appleUserInfo.email())
                 : requestedEmail;
 
         String nickname = resolveAppleNickname(request.fullName());
@@ -346,6 +346,15 @@ public class AuthService {
         }
 
         return nickname;
+    }
+
+    private String availableSocialEmail(String requestedEmail) {
+        String email = EmailPolicy.normalize(requestedEmail);
+        if (email == null || userRepository.existsByEmailAndDeletedAtIsNull(email)) {
+            return null;
+        }
+
+        return email;
     }
 
     private void notifySignup(String method) {
