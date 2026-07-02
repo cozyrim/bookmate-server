@@ -21,6 +21,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
@@ -362,6 +364,20 @@ public class AuthService {
     }
 
     private void notifySignup(String method) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    sendSignupNotification(method);
+                }
+            });
+            return;
+        }
+
+        sendSignupNotification(method);
+    }
+
+    private void sendSignupNotification(String method) {
         try {
             SignupStats stats = new SignupStats(
                     userRepository.countByDeletedAtIsNull(),
@@ -373,6 +389,7 @@ public class AuthService {
             discordLoginNotificationService.notifySignup(method, stats);
         } catch (Exception exception) {
             log.warn("Signup notification failed for method={}", method, exception);
+            discordLoginNotificationService.notifySignupStatsUnavailable(method);
         }
     }
 }

@@ -77,6 +77,46 @@ public class DiscordLoginNotificationService {
         }
     }
 
+    public void notifySignupStatsUnavailable(String method) {
+        if (webhookUrl == null || webhookUrl.isBlank()) {
+            return;
+        }
+
+        try {
+            Map<String, Object> embed = Map.of(
+                    "title", "BookMate 신규 가입",
+                    "color", 15158332,
+                    "fields", List.of(
+                            Map.of(
+                                    "name", "가입 경로",
+                                    "value", "**" + displayMethod(method) + "**",
+                                    "inline", true
+                            ),
+                            Map.of(
+                                    "name", "가입 통계",
+                                    "value", "가입은 정상 처리됐지만 통계를 불러오지 못했어요.",
+                                    "inline", false
+                            )
+                    ),
+                    "timestamp", Instant.now().toString()
+            );
+
+            Map<String, Object> payload = Map.of(
+                    "embeds", List.of(embed),
+                    "allowed_mentions", Map.of("parse", List.of())
+            );
+
+            HttpRequest request = HttpRequest.newBuilder(URI.create(webhookUrl))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload), StandardCharsets.UTF_8))
+                    .build();
+
+            httpClient.sendAsync(request, HttpResponse.BodyHandlers.discarding());
+        } catch (Exception ignored) {
+            // Login should not fail just because an admin notification failed.
+        }
+    }
+
     private String displayMethod(String method) {
         return switch (method) {
             case "apple" -> "Apple";

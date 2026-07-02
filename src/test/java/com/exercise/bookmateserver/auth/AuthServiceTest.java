@@ -12,6 +12,8 @@ import com.exercise.bookmateserver.user.UserEntity;
 import com.exercise.bookmateserver.user.UserRepository;
 import com.exercise.bookmateserver.word.WordRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.Optional;
 
@@ -184,5 +186,113 @@ class AuthServiceTest {
         assertThat(response.accessToken()).isEqualTo("bookmate-token");
         assertThat(response.user().provider().name()).isEqualTo("APPLE");
         verify(discordLoginNotificationService, never()).notifySignup(any(), any());
+        verify(discordLoginNotificationService).notifySignupStatsUnavailable("apple");
+    }
+
+    @Test
+    void signupSucceedsWhenSignupNotificationFails() {
+        UserRepository userRepository = mock(UserRepository.class);
+        TokenService tokenService = mock(TokenService.class);
+        DiscordLoginNotificationService discordLoginNotificationService = mock(DiscordLoginNotificationService.class);
+        AuthService authService = new AuthService(
+                userRepository,
+                mock(BookRepository.class),
+                mock(WordRepository.class),
+                mock(QuoteRepository.class),
+                mock(ReadingMemoRepository.class),
+                mock(NotificationDeviceTokenRepository.class),
+                mock(NotificationInboxRepository.class),
+                mock(KakaoClient.class),
+                mock(AppleIdentityTokenVerifier.class),
+                tokenService,
+                mock(NicknameGenerator.class),
+                mock(ContentModerationPolicy.class),
+                mock(ModerationService.class),
+                discordLoginNotificationService
+        );
+
+        when(userRepository.existsByEmailAndDeletedAtIsNull("user@example.com"))
+                .thenReturn(false);
+        when(userRepository.existsByNicknameIgnoreCase("북메이트"))
+                .thenReturn(false);
+        when(userRepository.save(any(UserEntity.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.countByDeletedAtIsNull())
+                .thenThrow(new RuntimeException("count failed"));
+        when(tokenService.createAccessToken(any(UserEntity.class)))
+                .thenReturn("bookmate-token");
+
+        AuthResponse response = authService.signup(new SignupRequest(
+                "user@example.com",
+                "password123!",
+                "북메이트",
+                null
+        ));
+
+        assertThat(response.accessToken()).isEqualTo("bookmate-token");
+        assertThat(response.user().email()).isEqualTo("user@example.com");
+        assertThat(response.user().provider().name()).isEqualTo("LOCAL");
+        verify(discordLoginNotificationService, never()).notifySignup(any(), any());
+        verify(discordLoginNotificationService).notifySignupStatsUnavailable("bookmate");
+    }
+
+    @Test
+    void signupNotificationRunsAfterCommitWhenTransactionSynchronizationIsActive() {
+        KakaoClient kakaoClient = mock(KakaoClient.class);
+        AppleIdentityTokenVerifier appleIdentityTokenVerifier = mock(AppleIdentityTokenVerifier.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        TokenService tokenService = mock(TokenService.class);
+        DiscordLoginNotificationService discordLoginNotificationService = mock(DiscordLoginNotificationService.class);
+        AuthService authService = new AuthService(
+                userRepository,
+                mock(BookRepository.class),
+                mock(WordRepository.class),
+                mock(QuoteRepository.class),
+                mock(ReadingMemoRepository.class),
+                mock(NotificationDeviceTokenRepository.class),
+                mock(NotificationInboxRepository.class),
+                kakaoClient,
+                appleIdentityTokenVerifier,
+                tokenService,
+                mock(NicknameGenerator.class),
+                mock(ContentModerationPolicy.class),
+                mock(ModerationService.class),
+                discordLoginNotificationService
+        );
+
+        when(kakaoClient.fetchUserInfo("kakao-access-token"))
+                .thenReturn(new KakaoUserInfo("12345", null, "북메이트", null));
+        when(userRepository.findByProviderAndProviderIdAndDeletedAtIsNull(any(), any()))
+                .thenReturn(Optional.empty());
+        when(userRepository.save(any(UserEntity.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.countByDeletedAtIsNull())
+                .thenReturn(1L);
+        when(userRepository.countByProviderAndDeletedAtIsNull(AuthProvider.LOCAL))
+                .thenReturn(0L);
+        when(userRepository.countByProviderAndDeletedAtIsNull(AuthProvider.KAKAO))
+                .thenReturn(1L);
+        when(userRepository.countByProviderAndDeletedAtIsNull(AuthProvider.APPLE))
+                .thenReturn(0L);
+        when(tokenService.createAccessToken(any(UserEntity.class)))
+                .thenReturn("bookmate-token");
+
+        try {
+            TransactionSynchronizationManager.initSynchronization();
+
+            AuthResponse response = authService.loginWithKakao(new KakaoLoginRequest("kakao-access-token"));
+
+            assertThat(response.accessToken()).isEqualTo("bookmate-token");
+            verify(discordLoginNotificationService, never()).notifySignup(any(), any());
+
+            for (TransactionSynchronization synchronization : TransactionSynchronizationManager.getSynchronizations()) {
+                synchronization.afterCommit();
+            }
+
+            verify(discordLoginNotificationService)
+                    .notifySignup(eq("kakao"), eq(new SignupStats(1L, 0L, 1L, 0L)));
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 }
