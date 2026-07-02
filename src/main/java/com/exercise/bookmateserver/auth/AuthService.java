@@ -23,6 +23,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -44,10 +45,12 @@ public class AuthService {
     private final NotificationDeviceTokenRepository notificationDeviceTokenRepository;
     private final NotificationInboxRepository notificationInboxRepository;
     private final KakaoClient kakaoClient;
+    private final AppleIdentityTokenVerifier appleIdentityTokenVerifier;
     private final TokenService tokenService;
     private final NicknameGenerator nicknameGenerator;
     private final ContentModerationPolicy contentModerationPolicy;
     private final ModerationService moderationService;
+    private final DiscordLoginNotificationService discordLoginNotificationService;
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public AuthService(
@@ -59,10 +62,12 @@ public class AuthService {
             NotificationDeviceTokenRepository notificationDeviceTokenRepository,
             NotificationInboxRepository notificationInboxRepository,
             KakaoClient kakaoClient,
+            AppleIdentityTokenVerifier appleIdentityTokenVerifier,
             TokenService tokenService,
             NicknameGenerator nicknameGenerator,
             ContentModerationPolicy contentModerationPolicy,
-            ModerationService moderationService
+            ModerationService moderationService,
+            DiscordLoginNotificationService discordLoginNotificationService
     ) {
         this.userRepository = userRepository;
         this.bookRepository = bookRepository;
@@ -72,10 +77,12 @@ public class AuthService {
         this.notificationDeviceTokenRepository = notificationDeviceTokenRepository;
         this.notificationInboxRepository = notificationInboxRepository;
         this.kakaoClient = kakaoClient;
+        this.appleIdentityTokenVerifier = appleIdentityTokenVerifier;
         this.tokenService = tokenService;
         this.nicknameGenerator = nicknameGenerator;
         this.contentModerationPolicy = contentModerationPolicy;
         this.moderationService = moderationService;
+        this.discordLoginNotificationService = discordLoginNotificationService;
     }
 
     @Transactional
@@ -100,6 +107,7 @@ public class AuthService {
         );
 
         UserEntity savedUser = userRepository.save(user);
+        notifySignup("bookmate");
         return AuthResponse.of(tokenService.createAccessToken(savedUser), savedUser);
     }
 
@@ -163,15 +171,18 @@ public class AuthService {
         KakaoUserInfo kakaoUserInfo = kakaoClient.fetchUserInfo(request.accessToken());
         String email = EmailPolicy.normalize(kakaoUserInfo.email());
 
-        UserEntity user = userRepository
-                .findByProviderAndProviderIdAndDeletedAtIsNull(AuthProvider.KAKAO, kakaoUserInfo.providerId())
-                .map(existingUser -> {
-                    existingUser.updateKakaoProfile(
+        Optional<UserEntity> existingUser = userRepository
+                .findByProviderAndProviderIdAndDeletedAtIsNull(AuthProvider.KAKAO, kakaoUserInfo.providerId());
+        boolean isNewUser = existingUser.isEmpty();
+
+        UserEntity user = existingUser
+                .map(userEntity -> {
+                    userEntity.updateKakaoProfile(
                             email,
                             resolveKakaoNickname(kakaoUserInfo.nickname()),
                             kakaoUserInfo.profileImageUrl()
                     );
-                    return existingUser;
+                    return userEntity;
                 })
                 .orElseGet(() -> userRepository.save(UserEntity.createKakao(
                         kakaoUserInfo.providerId(),
@@ -179,6 +190,48 @@ public class AuthService {
                         resolveKakaoNickname(kakaoUserInfo.nickname()),
                         kakaoUserInfo.profileImageUrl()
                 )));
+
+        if (isNewUser) {
+            notifySignup("kakao");
+        }
+
+        return AuthResponse.of(tokenService.createAccessToken(user), user);
+    }
+
+    @Transactional
+    public AuthResponse loginWithApple(AppleLoginRequest request) {
+        AppleUserInfo appleUserInfo = appleIdentityTokenVerifier.verify(
+                request.identityToken(),
+                request.userIdentifier()
+        );
+
+        String requestedEmail = EmailPolicy.normalize(request.email());
+        String email = requestedEmail == null
+                ? EmailPolicy.normalize(appleUserInfo.email())
+                : requestedEmail;
+
+        String nickname = resolveAppleNickname(request.fullName());
+        String resolvedEmail = email;
+        String resolvedNickname = nickname;
+
+        Optional<UserEntity> existingUser = userRepository
+                .findByProviderAndProviderIdAndDeletedAtIsNull(AuthProvider.APPLE, appleUserInfo.providerId());
+        boolean isNewUser = existingUser.isEmpty();
+
+        UserEntity user = existingUser
+                .map(existing -> {
+                    existing.updateAppleAccountInfo(resolvedEmail, resolvedNickname);
+                    return existing;
+                })
+                .orElseGet(() -> userRepository.save(UserEntity.createApple(
+                        appleUserInfo.providerId(),
+                        resolvedEmail,
+                        resolvedNickname
+                )));
+
+        if (isNewUser) {
+            notifySignup("apple");
+        }
 
         return AuthResponse.of(tokenService.createAccessToken(user), user);
     }
@@ -278,5 +331,31 @@ public class AuthService {
         }
 
         return nickname;
+    }
+
+    private String resolveAppleNickname(String requestedName) {
+        String nickname = NicknamePolicy.normalize(requestedName);
+        if (nickname == null || userRepository.existsByNicknameIgnoreCase(nickname)) {
+            return nicknameGenerator.generateUniqueNickname();
+        }
+
+        try {
+            NicknamePolicy.validate(nickname);
+        } catch (IllegalArgumentException exception) {
+            return nicknameGenerator.generateUniqueNickname();
+        }
+
+        return nickname;
+    }
+
+    private void notifySignup(String method) {
+        SignupStats stats = new SignupStats(
+                userRepository.countByDeletedAtIsNull(),
+                userRepository.countByProviderAndDeletedAtIsNull(AuthProvider.LOCAL),
+                userRepository.countByProviderAndDeletedAtIsNull(AuthProvider.KAKAO),
+                userRepository.countByProviderAndDeletedAtIsNull(AuthProvider.APPLE)
+        );
+
+        discordLoginNotificationService.notifySignup(method, stats);
     }
 }

@@ -9,6 +9,8 @@ cp .env.staging.example .env.staging
 ```
 
 2. Edit `.env.staging` and replace every `change-this...` value.
+   Set `DISCORD_LOGIN_WEBHOOK_URL` only if login notifications should be sent
+   to a private Discord channel.
 
 You can generate secrets with:
 

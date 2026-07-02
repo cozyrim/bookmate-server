@@ -94,6 +94,10 @@ public class UserEntity {
         return new UserEntity(email, null, AuthProvider.KAKAO, providerId, nickname, profileImageUrl);
     }
 
+    public static UserEntity createApple(String providerId, String email, String nickname) {
+        return new UserEntity(email, null, AuthProvider.APPLE, providerId, nickname, null);
+    }
+
     public void updateProfile(String nickname, String profileImageUrl, boolean isPublic, String roomTheme) {
         if (nickname != null && !nickname.isBlank()) {
             this.nickname = normalizeNickname(nickname);
@@ -122,6 +126,16 @@ public class UserEntity {
     public void updateKakaoAccountInfo(String email) {
         if (this.email == null || this.email.isBlank()) {
             this.email = normalizeEmail(email);
+        }
+    }
+
+    public void updateAppleAccountInfo(String email, String nickname) {
+        if (this.email == null || this.email.isBlank()) {
+            this.email = normalizeEmail(email);
+        }
+
+        if (this.nickname == null || this.nickname.isBlank() || DEFAULT_NICKNAME.equals(this.nickname)) {
+            this.nickname = normalizeNickname(nickname);
         }
     }
 

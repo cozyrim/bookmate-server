@@ -58,6 +58,12 @@ public class AuthController {
         return authService.loginWithKakao(request);
     }
 
+    @Operation(summary = "Apple 로그인", description = "Apple identity token으로 로그인하거나 자동 회원가입합니다.")
+    @PostMapping("/api/auth/apple")
+    public AuthResponse appleLogin(@Valid @RequestBody AppleLoginRequest request) {
+        return authService.loginWithApple(request);
+    }
+
     @Operation(summary = "로그아웃", description = "현재 서버 토큰은 stateless 방식이므로 클라이언트에서 토큰을 삭제하면 로그아웃됩니다.")
     @PostMapping("/api/auth/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
