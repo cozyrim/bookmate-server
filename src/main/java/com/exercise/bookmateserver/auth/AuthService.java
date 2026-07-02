@@ -14,6 +14,8 @@ import com.exercise.bookmateserver.user.ProfileUpdateRequest;
 import com.exercise.bookmateserver.user.UserEntity;
 import com.exercise.bookmateserver.user.UserRepository;
 import com.exercise.bookmateserver.word.WordRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,6 +31,8 @@ import java.util.UUID;
 @Service
 @Transactional(readOnly = true)
 public class AuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
     private static final String EMAIL_DUPLICATED_MESSAGE = "이미 가입된 이메일입니다.";
     private static final String EMAIL_AVAILABLE_MESSAGE = "가입 가능한 이메일입니다.";
@@ -358,13 +362,17 @@ public class AuthService {
     }
 
     private void notifySignup(String method) {
-        SignupStats stats = new SignupStats(
-                userRepository.countByDeletedAtIsNull(),
-                userRepository.countByProviderAndDeletedAtIsNull(AuthProvider.LOCAL),
-                userRepository.countByProviderAndDeletedAtIsNull(AuthProvider.KAKAO),
-                userRepository.countByProviderAndDeletedAtIsNull(AuthProvider.APPLE)
-        );
+        try {
+            SignupStats stats = new SignupStats(
+                    userRepository.countByDeletedAtIsNull(),
+                    userRepository.countByProviderAndDeletedAtIsNull(AuthProvider.LOCAL),
+                    userRepository.countByProviderAndDeletedAtIsNull(AuthProvider.KAKAO),
+                    userRepository.countByProviderAndDeletedAtIsNull(AuthProvider.APPLE)
+            );
 
-        discordLoginNotificationService.notifySignup(method, stats);
+            discordLoginNotificationService.notifySignup(method, stats);
+        } catch (Exception exception) {
+            log.warn("Signup notification failed for method={}", method, exception);
+        }
     }
 }

@@ -20,8 +20,10 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
 
     Optional<UserEntity> findByProviderAndProviderIdAndDeletedAtIsNull(AuthProvider provider, String providerId);
 
+    @Query("SELECT COUNT(user) FROM UserEntity user WHERE user.deletedAt IS NULL")
     long countByDeletedAtIsNull();
 
+    @Query("SELECT COUNT(user) FROM UserEntity user WHERE user.provider = :provider AND user.deletedAt IS NULL")
     long countByProviderAndDeletedAtIsNull(AuthProvider provider);
 
     List<UserEntity> findByNicknameContainingIgnoreCaseAndIsPublicTrueAndDeletedAtIsNull(String nickname);

@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -132,5 +133,56 @@ class AuthServiceTest {
         assertThat(response.user().nickname()).isEqualTo("문장1234");
         verify(discordLoginNotificationService)
                 .notifySignup(eq("apple"), eq(new SignupStats(2L, 1L, 0L, 1L)));
+    }
+
+    @Test
+    void appleLoginSucceedsWhenSignupNotificationFails() {
+        KakaoClient kakaoClient = mock(KakaoClient.class);
+        AppleIdentityTokenVerifier appleIdentityTokenVerifier = mock(AppleIdentityTokenVerifier.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        TokenService tokenService = mock(TokenService.class);
+        NicknameGenerator nicknameGenerator = mock(NicknameGenerator.class);
+        DiscordLoginNotificationService discordLoginNotificationService = mock(DiscordLoginNotificationService.class);
+        AuthService authService = new AuthService(
+                userRepository,
+                mock(BookRepository.class),
+                mock(WordRepository.class),
+                mock(QuoteRepository.class),
+                mock(ReadingMemoRepository.class),
+                mock(NotificationDeviceTokenRepository.class),
+                mock(NotificationInboxRepository.class),
+                kakaoClient,
+                appleIdentityTokenVerifier,
+                tokenService,
+                nicknameGenerator,
+                mock(ContentModerationPolicy.class),
+                mock(ModerationService.class),
+                discordLoginNotificationService
+        );
+
+        when(appleIdentityTokenVerifier.verify("apple-identity-token", "apple-user-id"))
+                .thenReturn(new AppleUserInfo("apple-user-id", null));
+        when(userRepository.findByProviderAndProviderIdAndDeletedAtIsNull(any(), any()))
+                .thenReturn(Optional.empty());
+        when(nicknameGenerator.generateUniqueNickname())
+                .thenReturn("북마크1234");
+        when(userRepository.save(any(UserEntity.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.countByDeletedAtIsNull())
+                .thenThrow(new RuntimeException("count failed"));
+        when(tokenService.createAccessToken(any(UserEntity.class)))
+                .thenReturn("bookmate-token");
+
+        AuthResponse response = authService.loginWithApple(new AppleLoginRequest(
+                "apple-identity-token",
+                "apple-authorization-code",
+                "apple-user-id",
+                null,
+                null
+        ));
+
+        assertThat(response.accessToken()).isEqualTo("bookmate-token");
+        assertThat(response.user().provider().name()).isEqualTo("APPLE");
+        verify(discordLoginNotificationService, never()).notifySignup(any(), any());
     }
 }
