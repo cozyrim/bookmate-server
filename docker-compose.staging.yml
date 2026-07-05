@@ -2,10 +2,8 @@ name: bookmate-staging
 
 services:
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: bookmate-api:staging
+    image: ${API_IMAGE:-ghcr.io/cozyrim/bookmate-server:staging}
+    pull_policy: always
     container_name: bookmate-staging-api
     restart: unless-stopped
     env_file:
@@ -20,6 +18,9 @@ services:
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
       APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:-cozyrim.BookMate-mini}
       DISCORD_LOGIN_WEBHOOK_URL: ${DISCORD_LOGIN_WEBHOOK_URL:-}
+      FCM_ENABLED: ${FCM_ENABLED:-false}
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${FIREBASE_SERVICE_ACCOUNT_JSON:-}
+      FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRATION_SECONDS: ${JWT_EXPIRATION_SECONDS:-1209600}
       MODERATION_ADMIN_SECRET: ${MODERATION_ADMIN_SECRET:-}
