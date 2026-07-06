@@ -8,8 +8,6 @@ import com.exercise.bookmateserver.user.UserEntity;
 import com.exercise.bookmateserver.user.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -59,7 +57,7 @@ public class GuestbookService {
 
         GuestbookEntity message = new GuestbookEntity(targetUser, writer, request.content());
         GuestbookEntity savedMessage = guestbookRepository.save(message);
-        sendGuestbookNotificationAfterCommit(targetUser, writer, savedMessage);
+        pushNotificationService.sendGuestbookMessageNotification(targetUser, writer, savedMessage);
 
         return GuestbookMessageResponse.from(savedMessage);
     }
@@ -94,38 +92,5 @@ public class GuestbookService {
                 ModerationTargetType.GUESTBOOK_MESSAGE,
                 message.getId().toString()
         );
-    }
-
-    private void sendGuestbookNotificationAfterCommit(
-            UserEntity targetUser,
-            UserEntity writer,
-            GuestbookEntity message
-    ) {
-        UUID targetUserId = targetUser.getId();
-        UUID writerUserId = writer.getId();
-        String writerNickname = writer.getNickname();
-        UUID messageId = message.getId();
-
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            pushNotificationService.sendGuestbookMessageNotificationAsync(
-                    targetUserId,
-                    writerUserId,
-                    writerNickname,
-                    messageId
-            );
-            return;
-        }
-
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                pushNotificationService.sendGuestbookMessageNotificationAsync(
-                        targetUserId,
-                        writerUserId,
-                        writerNickname,
-                        messageId
-                );
-            }
-        });
     }
 }
