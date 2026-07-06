@@ -1,7 +1,5 @@
 package com.exercise.bookmateserver.notification;
 
-import com.exercise.bookmateserver.social.guestbook.GuestbookEntity;
-import com.exercise.bookmateserver.user.UserEntity;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
@@ -16,6 +14,7 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -86,36 +85,38 @@ public class PushNotificationService {
         }
     }
 
-    public void sendGuestbookMessageNotification(
-            UserEntity targetUser,
-            UserEntity writerUser,
-            GuestbookEntity message
+    @Async
+    @Transactional
+    public void sendGuestbookMessageNotificationAsync(
+            UUID targetUserId,
+            UUID writerUserId,
+            String writerNickname,
+            UUID messageId
     ) {
-        if (targetUser.getId().equals(writerUser.getId())) {
+        if (targetUserId.equals(writerUserId)) {
             log.info(
                     "Skipping guestbook push notification because writer and target are the same user. userId={} messageId={}",
-                    targetUser.getId(),
-                    message.getId()
+                    targetUserId,
+                    messageId
             );
             return;
         }
 
-        String writerNickname = writerUser.getNickname();
         log.info(
                 "Preparing guestbook push notification. targetUserId={} writerUserId={} messageId={}",
-                targetUser.getId(),
-                writerUser.getId(),
-                message.getId()
+                targetUserId,
+                writerUserId,
+                messageId
         );
 
-        sendToUser(targetUser.getId(), new PushNotificationPayload(
+        sendToUser(targetUserId, new PushNotificationPayload(
                 "서재에 새 방명록이 도착했어요",
                 writerNickname + "님이 방명록을 남겼어요.",
                 Map.of(
                         "type", "guestbook_message",
-                        "message_id", message.getId().toString(),
-                        "target_user_id", targetUser.getId().toString(),
-                        "writer_user_id", writerUser.getId().toString()
+                        "message_id", messageId.toString(),
+                        "target_user_id", targetUserId.toString(),
+                        "writer_user_id", writerUserId.toString()
                 )
         ));
     }
@@ -125,7 +126,10 @@ public class PushNotificationService {
         inboxService.recordNotification(userId, payload);
 
         if (firebaseMessaging == null) {
-            log.debug("Skipping push notification because FCM is not initialized. userId={}", userId);
+            log.warn(
+                    "Skipping push notification because FCM is not initialized. Check FCM_ENABLED and Firebase service account settings. userId={}",
+                    userId
+            );
             return;
         }
 
