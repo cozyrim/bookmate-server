@@ -1,0 +1,19 @@
+services:
+  api:
+    networks:
+      - default
+      - traefik_public_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_public_network"
+      - "traefik.http.routers.bookmate-production.priority=100"
+      - "traefik.http.routers.bookmate-production.entrypoints=websecure"
+      - "traefik.http.routers.bookmate-production.rule=Host(`${PRODUCTION_DOMAIN}`)"
+      - "traefik.http.routers.bookmate-production.service=bookmate-production"
+      - "traefik.http.routers.bookmate-production.tls=true"
+      - "traefik.http.routers.bookmate-production.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-myresolver}"
+      - "traefik.http.services.bookmate-production.loadbalancer.server.port=8080"
+
+networks:
+  traefik_public_network:
+    external: true

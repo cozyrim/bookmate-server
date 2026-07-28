@@ -107,3 +107,73 @@ The deployment script is `scripts/deploy-staging.sh`. It automatically uses
 `docker-compose.staging.traefik.yml` when the `traefik_public_network` Docker
 network exists. Set `USE_TRAEFIK=true` or `USE_TRAEFIK=false` in the workflow if
 you want to force either behavior.
+
+## Production on the Mini PC with Supabase
+
+Production uses a separate API container and Docker volume from staging. It
+does **not** start a local PostgreSQL container: the API connects to Supabase's
+session pooler instead.
+
+1. In the repository checkout used by the Mini PC runner, create the private
+   environment file from the example:
+
+   ```sh
+   cp .env.production.example .env.production
+   chmod 600 .env.production
+   ```
+
+2. Fill in the real values. Copy the Supabase **Session pooler / JDBC** details
+   into `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD`. Keep `DB_POOL_MIN_IDLE=0`
+   and `DB_POOL_KEEPALIVE_MS=0`. Use the current production `JWT_SECRET` so
+   existing app login tokens remain valid.
+
+   If the current Render service has `FCM_ENABLED=true`, copy its Firebase JSON
+   key to a private file on the Mini PC (outside the repository), then set:
+
+   ```dotenv
+   FCM_ENABLED=true
+   USE_FIREBASE_SECRET_FILE=true
+   FIREBASE_SERVICE_ACCOUNT_HOST_PATH=/home/<mini-pc-user>/bookmate-secrets/firebase-service-account.json
+   FIREBASE_SERVICE_ACCOUNT_PATH=/run/secrets/firebase-service-account.json
+   ```
+
+   The deployment mounts that file read-only. Do not put the Firebase JSON in
+   the repository or send it in chat. If `FCM_ENABLED=false`, leave all four
+   Firebase file settings disabled/empty.
+
+3. Before making the public DNS change, deploy and test the container locally:
+
+   ```sh
+   ./scripts/deploy-production.sh
+   curl http://127.0.0.1:18081/health
+   ```
+
+   The shared Traefik container automatically adds HTTPS routing for
+   `PRODUCTION_DOMAIN=api.bookmate.kr` when its Docker network exists. Do not
+   change the Cloudflare record until this health check succeeds.
+
+   To use the same local-build approach as the existing staging container,
+   clone the repository on the Mini PC and use this command instead. It builds
+   the Dockerfile on the Mini PC and does not require any GitHub Actions secret:
+
+   ```sh
+   BUILD_LOCAL=true API_IMAGE=bookmate-api:production ./scripts/deploy-production.sh
+   ```
+
+4. Optional but recommended: create a GitHub environment named `production`
+   and add a `PRODUCTION_ENV_FILE` environment secret containing the full,
+   private `.env.production` file. Then run the manual **Production deploy**
+   workflow. It deliberately never deploys production on every push to `main`.
+
+5. On cutover day, briefly prevent writes to the old Render API, run the final
+   Neon-to-Supabase migration verification, point Cloudflare `api.bookmate.kr`
+   at the Mini PC, and check:
+
+   ```sh
+   curl https://api.bookmate.kr/health
+   ```
+
+Keep Render and the Neon backup until the production API has been stable for a
+few days. If `R2_ENABLED=false`, new profile images are stored in the named
+`bookmate-production_profile_images` Docker volume. Existing profile images
+hosted only on Render must be copied before cancelling Render.

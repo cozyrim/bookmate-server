@@ -3,6 +3,13 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/bookmate}
     username: ${DB_USERNAME:bookmate}
     password: ${DB_PASSWORD:bookmate}
+    hikari:
+      # Let serverless Postgres suspend when the API is idle. Keeping a minimum
+      # pool or sending keepalive pings prevents Neon from scaling to zero.
+      minimum-idle: ${DB_POOL_MIN_IDLE:0}
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:3}
+      idle-timeout: ${DB_POOL_IDLE_TIMEOUT_MS:60000}
+      keepalive-time: ${DB_POOL_KEEPALIVE_MS:0}
 
   servlet:
     multipart:

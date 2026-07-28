@@ -1,0 +1,4 @@
+services:
+  api:
+    volumes:
+      - ${FIREBASE_SERVICE_ACCOUNT_HOST_PATH:?Set FIREBASE_SERVICE_ACCOUNT_HOST_PATH in .env.production}:/run/secrets/firebase-service-account.json:ro
