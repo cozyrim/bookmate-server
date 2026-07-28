@@ -6,6 +6,7 @@ API_IMAGE="${API_IMAGE:-}"
 USE_TRAEFIK="${USE_TRAEFIK:-auto}"
 USE_FIREBASE_SECRET_FILE="${USE_FIREBASE_SECRET_FILE:-}"
 BUILD_LOCAL="${BUILD_LOCAL:-false}"
+PRUNE_IMAGES="${PRUNE_IMAGES:-false}"
 IMAGE_PRUNE_UNTIL="${IMAGE_PRUNE_UNTIL:-168h}"
 
 if [[ ! -f "$ENV_FILE" ]]; then
@@ -59,7 +60,9 @@ for _ in {1..30}; do
   case "$health_status" in
     healthy|running)
       BOOKMATE_ENV_FILE="$ENV_FILE" API_IMAGE="$API_IMAGE" "${compose[@]}" --env-file "$ENV_FILE" ps
-      docker image prune -f --filter "until=$IMAGE_PRUNE_UNTIL"
+      if [[ "$PRUNE_IMAGES" == "true" ]]; then
+        docker image prune -f --filter "until=$IMAGE_PRUNE_UNTIL"
+      fi
       exit 0
       ;;
     unhealthy|exited|dead)
