@@ -166,8 +166,23 @@ session pooler instead.
    workflow. It deliberately never deploys production on every push to `main`.
 
 5. On cutover day, briefly prevent writes to the old Render API, run the final
-   Neon-to-Supabase migration verification, point Cloudflare `api.bookmate.kr`
-   at the Mini PC, and check:
+   Neon-to-Supabase migration, then verify it before pointing Cloudflare
+   `api.bookmate.kr` at the Mini PC:
+
+   ```sh
+   # Run on the Mac that has the current libpq client. This intentionally
+   # replaces the existing Supabase public tables with the final Neon backup.
+   bash scripts/migrate-neon-to-supabase.sh --replace-existing \
+     /Users/chaerim/Desktop/bookmate-migration-backups
+   bash scripts/verify-neon-to-supabase.sh
+   ```
+
+   Use `--replace-existing` only during the planned cutover window after
+   Render has stopped accepting public writes. The script creates a fresh local
+   Neon rollback backup before it changes Supabase.
+
+   After the verification passes, point Cloudflare `api.bookmate.kr` at the
+   Mini PC and check:
 
    ```sh
    curl https://api.bookmate.kr/health
