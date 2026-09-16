@@ -28,6 +28,7 @@ auth:
   jwt:
     secret: ${JWT_SECRET:bookmate-local-development-secret-change-me}
     expiration-seconds: ${JWT_EXPIRATION_SECONDS:1209600}
+    refresh-expiration-seconds: ${JWT_REFRESH_EXPIRATION_SECONDS:2592000}
 
 springdoc:
   api-docs:

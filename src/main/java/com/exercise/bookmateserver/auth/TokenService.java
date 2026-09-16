@@ -11,6 +11,8 @@ import org.springframework.web.server.ResponseStatusException;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Map;
@@ -20,19 +22,25 @@ import java.util.UUID;
 public class TokenService {
 
     private static final String HMAC_ALGORITHM = "HmacSHA256";
+    private static final String HASH_ALGORITHM = "SHA-256";
+    private static final int REFRESH_TOKEN_BYTE_LENGTH = 32;
 
     private final ObjectMapper objectMapper;
     private final byte[] secretBytes;
-    private final long expirationSeconds;
+    private final long accessTokenExpirationSeconds;
+    private final long refreshTokenExpirationSeconds;
+    private final SecureRandom secureRandom = new SecureRandom();
 
     public TokenService(
             ObjectMapper objectMapper,
             @Value("${auth.jwt.secret:bookmate-local-development-secret-change-me}") String secret,
-            @Value("${auth.jwt.expiration-seconds:1209600}") long expirationSeconds
+            @Value("${auth.jwt.expiration-seconds:1209600}") long accessTokenExpirationSeconds,
+            @Value("${auth.jwt.refresh-expiration-seconds:2592000}") long refreshTokenExpirationSeconds
     ) {
         this.objectMapper = objectMapper;
         this.secretBytes = secret.getBytes(StandardCharsets.UTF_8);
-        this.expirationSeconds = expirationSeconds;
+        this.accessTokenExpirationSeconds = accessTokenExpirationSeconds;
+        this.refreshTokenExpirationSeconds = refreshTokenExpirationSeconds;
     }
 
     public String createAccessToken(UserEntity user) {
@@ -45,7 +53,7 @@ public class TokenService {
         Map<String, Object> payload = Map.of(
                 "sub", user.getId().toString(),
                 "iat", now,
-                "exp", now + expirationSeconds
+                "exp", now + accessTokenExpirationSeconds
         );
 
         String encodedHeader = encodeJson(header);
@@ -54,6 +62,31 @@ public class TokenService {
         String signature = sign(unsignedToken);
 
         return unsignedToken + "." + signature;
+    }
+
+    /**
+     * Creates an opaque, high-entropy token for renewing an expired access token.
+     * Only its SHA-256 hash is persisted, so a database leak cannot be used as a
+     * refresh credential.
+     */
+    public String createRefreshToken() {
+        byte[] randomBytes = new byte[REFRESH_TOKEN_BYTE_LENGTH];
+        secureRandom.nextBytes(randomBytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
+    }
+
+    public String hashRefreshToken(String refreshToken) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance(HASH_ALGORITHM);
+            byte[] hash = digest.digest(refreshToken.getBytes(StandardCharsets.UTF_8));
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
+        } catch (Exception exception) {
+            throw new IllegalStateException("Refresh token 해시 생성에 실패했습니다.", exception);
+        }
+    }
+
+    public Instant refreshTokenExpiresAt() {
+        return Instant.now().plusSeconds(refreshTokenExpirationSeconds);
     }
 
     public UUID parseUserId(String token) {

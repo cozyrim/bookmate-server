@@ -114,7 +114,7 @@ public class AuthService {
 
         UserEntity savedUser = userRepository.save(user);
         notifySignup("bookmate");
-        return AuthResponse.of(tokenService.createAccessToken(savedUser), savedUser);
+        return issueTokens(savedUser);
     }
 
     public NicknameSuggestionResponse suggestNickname() {
@@ -161,6 +161,7 @@ public class AuthService {
         );
     }
 
+    @Transactional
     public AuthResponse login(LoginRequest request) {
         UserEntity user = userRepository.findByEmailAndDeletedAtIsNull(EmailPolicy.normalize(request.email()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다."));
@@ -169,7 +170,7 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다.");
         }
 
-        return AuthResponse.of(tokenService.createAccessToken(user), user);
+        return issueTokens(user);
     }
 
     @Transactional
@@ -201,7 +202,7 @@ public class AuthService {
             notifySignup("kakao");
         }
 
-        return AuthResponse.of(tokenService.createAccessToken(user), user);
+        return issueTokens(user);
     }
 
     @Transactional
@@ -239,7 +240,25 @@ public class AuthService {
             notifySignup("apple");
         }
 
-        return AuthResponse.of(tokenService.createAccessToken(user), user);
+        return issueTokens(user);
+    }
+
+    /**
+     * Rotates a valid refresh token. A row-level lock prevents two concurrent
+     * refresh requests from both succeeding with the same credential.
+     */
+    @Transactional
+    public TokenRefreshResponse refresh(RefreshTokenRequest request) {
+        String refreshTokenHash = tokenService.hashRefreshToken(request.refreshToken());
+        UserEntity user = userRepository.findByRefreshTokenHashAndDeletedAtIsNull(refreshTokenHash)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token이 유효하지 않습니다."));
+
+        if (!user.hasValidRefreshToken(java.time.Instant.now())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token이 만료되었습니다.");
+        }
+
+        AuthResponse rotatedTokens = issueTokens(user);
+        return TokenRefreshResponse.of(rotatedTokens.accessToken(), rotatedTokens.refreshToken());
     }
 
     public ProfileResponse getProfile(UserEntity user) {
@@ -277,6 +296,16 @@ public class AuthService {
         long readBookCount = bookRepository.countByUserIdAndProgressGreaterThanEqual(user.getId(), 1.0);
 
         return ProfileResponse.of(user, togetherDays, savedWordCount, readBookCount);
+    }
+
+    private AuthResponse issueTokens(UserEntity user) {
+        String refreshToken = tokenService.createRefreshToken();
+        user.replaceRefreshToken(
+                tokenService.hashRefreshToken(refreshToken),
+                tokenService.refreshTokenExpiresAt()
+        );
+
+        return AuthResponse.of(tokenService.createAccessToken(user), refreshToken, user);
     }
 
     private void validateEmailAvailable(String email) {
