@@ -14,6 +14,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -66,6 +67,12 @@ public class UserEntity {
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
+
+    @Column(name = "refresh_token_hash", unique = true, length = 43)
+    private String refreshTokenHash;
+
+    @Column(name = "refresh_token_expires_at")
+    private Instant refreshTokenExpiresAt;
 
     protected UserEntity() {
     }
@@ -151,7 +158,24 @@ public class UserEntity {
         this.profileImageUrl = null;
         this.isPublic = false;
         this.roomTheme = "AppBackground";
+        clearRefreshToken();
         this.deletedAt = LocalDateTime.now();
+    }
+
+    public void replaceRefreshToken(String refreshTokenHash, Instant refreshTokenExpiresAt) {
+        this.refreshTokenHash = refreshTokenHash;
+        this.refreshTokenExpiresAt = refreshTokenExpiresAt;
+    }
+
+    public void clearRefreshToken() {
+        this.refreshTokenHash = null;
+        this.refreshTokenExpiresAt = null;
+    }
+
+    public boolean hasValidRefreshToken(Instant now) {
+        return refreshTokenHash != null
+                && refreshTokenExpiresAt != null
+                && refreshTokenExpiresAt.isAfter(now);
     }
 
     @PrePersist

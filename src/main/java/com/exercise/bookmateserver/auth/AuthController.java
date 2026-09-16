@@ -64,7 +64,13 @@ public class AuthController {
         return authService.loginWithApple(request);
     }
 
-    @Operation(summary = "로그아웃", description = "현재 서버 토큰은 stateless 방식이므로 클라이언트에서 토큰을 삭제하면 로그아웃됩니다.")
+    @Operation(summary = "토큰 재발급", description = "유효한 refresh token을 확인한 뒤 access token과 refresh token을 함께 회전 발급합니다.")
+    @PostMapping("/api/auth/refresh")
+    public TokenRefreshResponse refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        return authService.refresh(request);
+    }
+
+    @Operation(summary = "로그아웃", description = "클라이언트에서 Keychain 토큰을 삭제하면 로그아웃됩니다.")
     @PostMapping("/api/auth/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void logout() {

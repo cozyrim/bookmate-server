@@ -1,8 +1,11 @@
 package com.exercise.bookmateserver.user;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import jakarta.persistence.LockModeType;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -19,6 +22,9 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
     boolean existsByNicknameIgnoreCaseAndIdNot(String nickname, UUID id);
 
     Optional<UserEntity> findByProviderAndProviderIdAndDeletedAtIsNull(AuthProvider provider, String providerId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<UserEntity> findByRefreshTokenHashAndDeletedAtIsNull(String refreshTokenHash);
 
     @Query("SELECT COUNT(user) FROM UserEntity user WHERE user.deletedAt IS NULL")
     long countByDeletedAtIsNull();

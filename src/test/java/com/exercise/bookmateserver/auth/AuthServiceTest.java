@@ -16,8 +16,10 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.Optional;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
@@ -26,6 +28,73 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class AuthServiceTest {
+
+    @Test
+    void refreshRotatesTokensWhenStoredRefreshTokenIsValid() {
+        UserRepository userRepository = mock(UserRepository.class);
+        TokenService tokenService = mock(TokenService.class);
+        UserEntity user = mock(UserEntity.class);
+        AuthService authService = new AuthService(
+                userRepository,
+                mock(BookRepository.class),
+                mock(WordRepository.class),
+                mock(QuoteRepository.class),
+                mock(ReadingMemoRepository.class),
+                mock(NotificationDeviceTokenRepository.class),
+                mock(NotificationInboxRepository.class),
+                mock(KakaoClient.class),
+                mock(AppleIdentityTokenVerifier.class),
+                tokenService,
+                mock(NicknameGenerator.class),
+                mock(ContentModerationPolicy.class),
+                mock(ModerationService.class),
+                mock(DiscordLoginNotificationService.class)
+        );
+
+        when(tokenService.hashRefreshToken("old-refresh-token")).thenReturn("old-token-hash");
+        when(userRepository.findByRefreshTokenHashAndDeletedAtIsNull("old-token-hash"))
+                .thenReturn(Optional.of(user));
+        when(user.hasValidRefreshToken(org.mockito.ArgumentMatchers.any(Instant.class))).thenReturn(true);
+        when(tokenService.createRefreshToken()).thenReturn("new-refresh-token");
+        when(tokenService.hashRefreshToken("new-refresh-token")).thenReturn("new-token-hash");
+        when(tokenService.refreshTokenExpiresAt()).thenReturn(Instant.parse("2026-10-16T00:00:00Z"));
+        when(tokenService.createAccessToken(user)).thenReturn("new-access-token");
+
+        TokenRefreshResponse response = authService.refresh(new RefreshTokenRequest("old-refresh-token"));
+
+        assertThat(response.accessToken()).isEqualTo("new-access-token");
+        assertThat(response.refreshToken()).isEqualTo("new-refresh-token");
+        verify(user).replaceRefreshToken("new-token-hash", Instant.parse("2026-10-16T00:00:00Z"));
+    }
+
+    @Test
+    void refreshRejectsUnknownRefreshToken() {
+        UserRepository userRepository = mock(UserRepository.class);
+        TokenService tokenService = mock(TokenService.class);
+        AuthService authService = new AuthService(
+                userRepository,
+                mock(BookRepository.class),
+                mock(WordRepository.class),
+                mock(QuoteRepository.class),
+                mock(ReadingMemoRepository.class),
+                mock(NotificationDeviceTokenRepository.class),
+                mock(NotificationInboxRepository.class),
+                mock(KakaoClient.class),
+                mock(AppleIdentityTokenVerifier.class),
+                tokenService,
+                mock(NicknameGenerator.class),
+                mock(ContentModerationPolicy.class),
+                mock(ModerationService.class),
+                mock(DiscordLoginNotificationService.class)
+        );
+
+        when(tokenService.hashRefreshToken("unknown-refresh-token")).thenReturn("unknown-token-hash");
+        when(userRepository.findByRefreshTokenHashAndDeletedAtIsNull("unknown-token-hash"))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest("unknown-refresh-token")))
+                .hasMessageContaining("Refresh token이 유효하지 않습니다.");
+    }
 
     @Test
     void kakaoLoginAllowsMissingEmail() {
