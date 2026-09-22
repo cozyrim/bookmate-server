@@ -1,6 +1,7 @@
 package com.exercise.bookmateserver.readingmemo;
 
 import com.exercise.bookmateserver.user.UserEntity;
+import com.exercise.bookmateserver.book.BookRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,13 +15,18 @@ import java.util.UUID;
 public class ReadingMemoService {
 
     private final ReadingMemoRepository readingMemoRepository;
+    private final BookRepository bookRepository;
 
-    public ReadingMemoService(ReadingMemoRepository readingMemoRepository) {
+    public ReadingMemoService(ReadingMemoRepository readingMemoRepository, BookRepository bookRepository) {
         this.readingMemoRepository = readingMemoRepository;
+        this.bookRepository = bookRepository;
     }
 
     @Transactional
     public ReadingMemoResponse createMemo(UserEntity user, ReadingMemoCreateRequest request) {
+        bookRepository.findByIdAndUserId(request.bookId(), user.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "책을 찾을 수 없습니다."));
+
         ReadingMemoEntity memo = new ReadingMemoEntity(
                 user.getId(),
                 request.bookId(),

@@ -15,6 +15,12 @@ import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.IOException;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
+import java.io.ByteArrayInputStream;
+import java.util.Iterator;
+import java.util.Set;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -154,8 +160,32 @@ public class ProfileImageStorageService {
         }
 
         String contentType = image.getContentType();
-        if (contentType == null || !contentType.toLowerCase(Locale.ROOT).startsWith("image/")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지 파일만 업로드할 수 있습니다.");
+        if (contentType == null || !Set.of("image/jpeg", "image/png").contains(contentType.toLowerCase(Locale.ROOT))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "JPEG 또는 PNG 이미지만 업로드할 수 있습니다.");
+        }
+
+        // Check the bytes, not only the client-supplied MIME type. Read dimensions
+        // before decoding pixels to reject oversized images without a large allocation.
+        try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(image.getBytes()))) {
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
+            if (!readers.hasNext()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "올바른 이미지 파일이 아닙니다.");
+            }
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(input);
+                String format = reader.getFormatName().toLowerCase(Locale.ROOT);
+                String expectedFormat = contentType.equalsIgnoreCase("image/png") ? "png" : "jpeg";
+                if (!expectedFormat.equals(format)
+                        || (long) reader.getWidth(0) * reader.getHeight(0) > 20_000_000L) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지 형식 또는 크기를 확인해주세요.");
+                }
+                reader.read(0);
+            } finally {
+                reader.dispose();
+            }
+        } catch (IOException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "올바른 이미지 파일이 아닙니다.");
         }
     }
 

@@ -33,10 +33,14 @@ public class TokenService {
 
     public TokenService(
             ObjectMapper objectMapper,
-            @Value("${auth.jwt.secret:bookmate-local-development-secret-change-me}") String secret,
+            @Value("${auth.jwt.secret}") String secret,
             @Value("${auth.jwt.expiration-seconds:1209600}") long accessTokenExpirationSeconds,
             @Value("${auth.jwt.refresh-expiration-seconds:2592000}") long refreshTokenExpirationSeconds
     ) {
+        if (secret == null || secret.isBlank() || secret.getBytes(StandardCharsets.UTF_8).length < 32
+                || secret.equals("bookmate-local-development-secret-change-me") || secret.startsWith("change-this")) {
+            throw new IllegalArgumentException("JWT_SECRET must be a non-placeholder secret of at least 32 bytes.");
+        }
         this.objectMapper = objectMapper;
         this.secretBytes = secret.getBytes(StandardCharsets.UTF_8);
         this.accessTokenExpirationSeconds = accessTokenExpirationSeconds;
@@ -109,7 +113,7 @@ public class TokenService {
             });
 
             Object exp = payload.get("exp");
-            if (!(exp instanceof Number expNumber) || expNumber.longValue() < Instant.now().getEpochSecond()) {
+            if (!(exp instanceof Number expNumber) || expNumber.longValue() <= Instant.now().getEpochSecond()) {
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "토큰이 만료되었습니다.");
             }
 

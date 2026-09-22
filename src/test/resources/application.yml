@@ -9,3 +9,7 @@ spring:
     hibernate:
       ddl-auto: create-drop
     show-sql: false
+
+auth:
+  jwt:
+    secret: test-only-signing-key-not-for-production-123456

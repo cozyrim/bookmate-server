@@ -1,12 +1,19 @@
 plugins {
 	id 'java'
-	id 'org.springframework.boot' version '4.0.6'
+	id 'org.springframework.boot' version '4.0.8'
 	id 'io.spring.dependency-management' version '1.1.7'
 }
 
 group = 'com.exercise'
 version = '0.0.1-SNAPSHOT'
 description = 'BookMate-server'
+
+// Security fixes newer than the Spring Boot 4.0.8 managed dependency set.
+// Revisit these overrides when upgrading the Boot maintenance release.
+ext['tomcat.version'] = '11.0.25'
+ext['httpclient5.version'] = '5.6.3'
+ext['httpcore5.version'] = '5.4.3'
+ext['opentelemetry.version'] = '1.62.0'
 
 java {
 	toolchain {

@@ -212,10 +212,8 @@ public class AuthService {
                 request.userIdentifier()
         );
 
-        String requestedEmail = availableSocialEmail(request.email());
-        String email = requestedEmail == null
-                ? availableSocialEmail(appleUserInfo.email())
-                : requestedEmail;
+        // Only the signed Apple claim is authoritative; request.email is client input.
+        String email = availableSocialEmail(appleUserInfo.email());
 
         String nickname = resolveAppleNickname(request.fullName());
         String resolvedEmail = email;

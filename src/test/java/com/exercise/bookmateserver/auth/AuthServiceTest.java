@@ -147,7 +147,7 @@ class AuthServiceTest {
     }
 
     @Test
-    void appleLoginCreatesUserFromVerifiedIdentityToken() {
+    void appleLoginIgnoresClientEmailAndUsesVerifiedIdentityToken() {
         KakaoClient kakaoClient = mock(KakaoClient.class);
         AppleIdentityTokenVerifier appleIdentityTokenVerifier = mock(AppleIdentityTokenVerifier.class);
         UserRepository userRepository = mock(UserRepository.class);
@@ -194,7 +194,7 @@ class AuthServiceTest {
                 "apple-identity-token",
                 "apple-authorization-code",
                 "apple-user-id",
-                null,
+                "unverified@example.com",
                 "문장1234"
         ));
 

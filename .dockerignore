@@ -10,3 +10,17 @@ uploads
 .env
 .env.*
 !.env*.example
+
+*.log
+*service-account*.json
+*serviceAccount*.json
+*firebase-adminsdk*.json
+*.pem
+*.p8
+*.p12
+.migration-backups
+.local
+.claude
+.codex
+.agents
+_workspace

@@ -26,7 +26,7 @@ server:
 
 auth:
   jwt:
-    secret: ${JWT_SECRET:bookmate-local-development-secret-change-me}
+    secret: ${JWT_SECRET}
     expiration-seconds: ${JWT_EXPIRATION_SECONDS:1209600}
     refresh-expiration-seconds: ${JWT_REFRESH_EXPIRATION_SECONDS:2592000}
 
@@ -43,6 +43,8 @@ app:
   public-base-url: ${PUBLIC_BASE_URL:http://127.0.0.1:8080}
   apple:
     client-id: ${APPLE_CLIENT_ID:cozyrim.BookMate-mini}
+  kakao:
+    app-id: ${KAKAO_APP_ID:}
   discord:
     login-webhook-url: ${DISCORD_LOGIN_WEBHOOK_URL:}
   moderation:

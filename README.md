@@ -1,194 +1,81 @@
-# bookMate-mini-server
+# 북메이트 서버 · BookMate API
 
-## Staging with Docker Compose
+**App Store에 출시한 북메이트의 회원 인증·독서 기록·공개 책장·알림을 처리하는 REST API.**
 
-1. Create the staging env file:
+책에서 찾은 단어와 문장을 책 단위로 저장하는 앱의 백엔드. 개인 기록은 작성자에게만 제공하고, 공개 책장과 리뷰는 공개·차단·신고 상태에 따라 구분.
+
+[iOS 앱 코드](https://github.com/cozyrim/bookmate-ios-public) · [개발 환경 설정](docs/setup.md) · [인증과 운영 보안 기준](docs/auth-and-access.md)
+
+## 주요 기능
+
+| 영역 | 구현 |
+| --- | --- |
+| 회원 | 이메일·카카오·Apple 로그인, 프로필 관리, 회원 탈퇴 |
+| 인증 | JWT access token, 해시로 보관하는 refresh token, 갱신 시 토큰 교체 |
+| 독서 기록 | 책·단어·문장·메모·리뷰 저장, 책별 기록 조회 |
+| 공개 공간 | 공개 사용자 검색·책장·리뷰·방명록, 신고·차단 |
+| 알림 | FCM 기기 토큰 등록, 방명록 푸시, 알림함과 읽음 처리 |
+| 이미지 | 프로필 이미지 검사 후 로컬 볼륨 또는 Cloudflare R2 저장 |
+
+## 문제를 해결한 과정
+
+### 토큰 갱신 요청이 겹칠 때 같은 자격 증명이 재사용되는 문제
+
+- **판단**: 로그인 상태를 유지하되 refresh token 원문을 DB에 남기지 않고, 갱신에 성공한 토큰은 다시 사용하지 않도록 처리할 필요.
+- **처리**: `SecureRandom`으로 토큰 생성, SHA-256 해시와 만료 시각만 저장. 조회 시 DB 행 잠금 후 새 토큰으로 교체.
+- **범위**: 사용자별 refresh token 한 개를 관리하므로 다른 기기에서 로그인하면 이전 refresh token은 대체됨. 동시성 검증은 실제 PostgreSQL 환경에서 추가 확인 필요.
+
+[갱신 순서와 세션 정책](docs/refresh-tokens.md)
+
+### 방명록 저장 응답이 외부 알림 발송까지 기다리는 문제
+
+- **판단**: 글 저장 성공과 푸시 전달 성공을 구분. 저장이 취소된 글에 알림이 나가거나 FCM 지연 때문에 저장 응답이 늦어지는 상황을 줄일 필요.
+- **처리**: 저장 트랜잭션 커밋 후 별도 Bean의 `@Async` 메서드로 알림 발송 요청.
+- **범위**: 커밋 후 발송 순서는 코드로 확인. 응답 시간 개선율은 측정 자료가 없어 미기재. 영속 큐를 사용하는 구조는 아님.
+
+[트랜잭션과 비동기 알림의 경계](docs/guestbook-notifications.md)
+
+### 화면에서 숨기는 것만으로 개인 기록을 보호할 수 없는 문제
+
+- **판단**: 요청에 포함된 책·메모 ID만 믿지 않고 서버가 확인한 사용자 ID로 소유권을 검사할 필요.
+- **처리**: 개인 기록 조회·수정·삭제에 사용자 조건 적용. 메모 생성도 소유한 책인지 확인한 뒤 저장. 공개 책장에서는 공개 여부와 차단·신고 조건 확인.
+- **검증**: 다른 사용자의 책에 메모를 작성하는 요청을 거부하는 테스트 추가. 로그인 토큰 검증과 데이터 소유권 검사를 서로 다른 단계로 관리.
+
+[접근 권한과 테스트 범위](docs/auth-and-access.md)
+
+## 구조와 기술
+
+```mermaid
+flowchart LR
+    App[iOS 앱] --> API[Controller · 요청 검증]
+    Auth[AuthInterceptor · 로그인 확인] --> API
+    API --> Service[Service · 소유권과 업무 규칙]
+    Service --> Repo[JPA Repository]
+    Repo --> DB[PostgreSQL]
+    Service --> Async[커밋 후 비동기 작업]
+    Async --> FCM[Firebase Cloud Messaging]
+```
+
+| 기술 | 사용 목적 |
+| --- | --- |
+| Java 21 · Spring Boot 4 | REST API와 애플리케이션 설정 |
+| Spring Data JPA · PostgreSQL | 데이터 저장, 트랜잭션, refresh token 행 잠금 |
+| BCrypt · HMAC-SHA256 | 비밀번호 해시, access token 서명 검증 |
+| Firebase Admin SDK | 서버에서 FCM 알림 발송 |
+| AWS SDK for Java | S3 호환 Cloudflare R2 이미지 저장 |
+| JUnit 5 · Mockito · H2 | 서비스·인증·업로드 검증, 애플리케이션 기동 테스트 |
+| Docker Compose · GitHub Actions | 컨테이너 구성과 테스트 자동화 |
+
+도메인별 패키지에 Controller·Service·Repository 배치. 인증은 `auth`, 외부 알림은 `notification`, 신고·차단은 `moderation`에서 관리.
+
+## 실행과 검증
 
 ```sh
-cp .env.staging.example .env.staging
+./gradlew --no-daemon test
 ```
 
-2. Edit `.env.staging` and replace every `change-this...` value.
-   Set `DISCORD_LOGIN_WEBHOOK_URL` only if login notifications should be sent
-   to a private Discord channel.
+테스트는 H2와 테스트 전용 서명키 사용. 외부 카카오 요청은 모의 응답으로 검증하며 운영 DB·실제 푸시 발송에 연결하지 않음.
 
-You can generate secrets with:
+검증 대상은 토큰 생성·만료·변조, refresh token 교체, 소셜 로그인 정보, 메모 소유권, 이미지 형식·크기. 실제 PostgreSQL 동시 요청, 운영 프록시 제한, 실기기 로그인·알림은 별도 통합 검증 대상.
 
-```sh
-openssl rand -base64 48
-```
-
-3. Pull and run the staging stack:
-
-```sh
-docker compose -f docker-compose.staging.yml --env-file .env.staging pull api
-docker compose -f docker-compose.staging.yml --env-file .env.staging up -d
-```
-
-On a server that already has a shared Traefik ingress network, use the Traefik
-override instead:
-
-```sh
-docker compose \
-  -f docker-compose.staging.yml \
-  -f docker-compose.staging.traefik.yml \
-  --env-file .env.staging \
-  pull api
-
-docker compose \
-  -f docker-compose.staging.yml \
-  -f docker-compose.staging.traefik.yml \
-  --env-file .env.staging \
-  up -d
-```
-
-For local staging builds from the current checkout, add the local build override:
-
-```sh
-docker compose \
-  -f docker-compose.staging.yml \
-  -f docker-compose.staging.local.yml \
-  --env-file .env.staging \
-  up -d --build
-```
-
-4. Check the API locally:
-
-```sh
-curl http://127.0.0.1:18080/health
-```
-
-The expected response is:
-
-```txt
-OK
-```
-
-If `staging-api.bookmate.kr` points to this server and the shared Traefik
-container owns ports 80/443, Traefik will proxy HTTPS traffic to the API:
-
-```sh
-curl https://staging-api.bookmate.kr/health
-```
-
-5. View logs:
-
-```sh
-docker compose -f docker-compose.staging.yml --env-file .env.staging logs -f api
-```
-
-6. Stop the stack:
-
-```sh
-docker compose -f docker-compose.staging.yml --env-file .env.staging down
-```
-
-Do not commit `.env.staging`. Commit only `.env.staging.example`.
-
-## Staging CI/CD
-
-GitHub Actions runs staging delivery from `.github/workflows/staging.yml`.
-
-- Pull requests to `main` run `./gradlew --no-daemon clean test`.
-- Pushes to `main` and manual workflow runs test first, then build and push a Docker image to GitHub Container Registry.
-- Images are tagged as `ghcr.io/cozyrim/bookmate-server:staging` and `ghcr.io/cozyrim/bookmate-server:<commit-sha>`.
-- Deployment uses the immutable commit SHA image, then waits for the `/health` Docker health check.
-
-Mini PC setup:
-
-1. Install Docker and Docker Compose.
-2. Install a GitHub Actions self-hosted runner for this repository on the mini PC.
-3. Add the runner label `bookmate-staging`.
-4. Make sure the runner user can run Docker commands.
-5. Create a GitHub environment named `staging`.
-6. Add an environment secret named `STAGING_ENV_FILE` whose value is the full contents of `.env.staging`.
-
-The deployment script is `scripts/deploy-staging.sh`. It automatically uses
-`docker-compose.staging.traefik.yml` when the `traefik_public_network` Docker
-network exists. Set `USE_TRAEFIK=true` or `USE_TRAEFIK=false` in the workflow if
-you want to force either behavior.
-
-## Production on the Mini PC with Supabase
-
-Production uses a separate API container and Docker volume from staging. It
-does **not** start a local PostgreSQL container: the API connects to Supabase's
-session pooler instead.
-
-1. In the repository checkout used by the Mini PC runner, create the private
-   environment file from the example:
-
-   ```sh
-   cp .env.production.example .env.production
-   chmod 600 .env.production
-   ```
-
-2. Fill in the real values. Copy the Supabase **Session pooler / JDBC** details
-   into `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD`. Keep `DB_POOL_MIN_IDLE=0`
-   and `DB_POOL_KEEPALIVE_MS=0`. Use the current production `JWT_SECRET` so
-   existing app login tokens remain valid.
-
-   If the current Render service has `FCM_ENABLED=true`, copy its Firebase JSON
-   key to a private file on the Mini PC (outside the repository), then set:
-
-   ```dotenv
-   FCM_ENABLED=true
-   USE_FIREBASE_SECRET_FILE=true
-   FIREBASE_SERVICE_ACCOUNT_HOST_PATH=/home/<mini-pc-user>/bookmate-secrets/firebase-service-account.json
-   FIREBASE_SERVICE_ACCOUNT_PATH=/run/secrets/firebase-service-account.json
-   ```
-
-   The deployment mounts that file read-only. Do not put the Firebase JSON in
-   the repository or send it in chat. If `FCM_ENABLED=false`, leave all four
-   Firebase file settings disabled/empty.
-
-3. Before making the public DNS change, deploy and test the container locally:
-
-   ```sh
-   ./scripts/deploy-production.sh
-   curl http://127.0.0.1:18081/health
-   ```
-
-   The shared Traefik container automatically adds HTTPS routing for
-   `PRODUCTION_DOMAIN=api.bookmate.kr` when its Docker network exists. Do not
-   change the Cloudflare record until this health check succeeds.
-
-   To use the same local-build approach as the existing staging container,
-   clone the repository on the Mini PC and use this command instead. It builds
-   the Dockerfile on the Mini PC and does not require any GitHub Actions secret:
-
-   ```sh
-   BUILD_LOCAL=true API_IMAGE=bookmate-api:production ./scripts/deploy-production.sh
-   ```
-
-4. Optional but recommended: create a GitHub environment named `production`
-   and add a `PRODUCTION_ENV_FILE` environment secret containing the full,
-   private `.env.production` file. Then run the manual **Production deploy**
-   workflow. It deliberately never deploys production on every push to `main`.
-
-5. On cutover day, briefly prevent writes to the old Render API, run the final
-   Neon-to-Supabase migration, then verify it before pointing Cloudflare
-   `api.bookmate.kr` at the Mini PC:
-
-   ```sh
-   # Run on the Mac that has the current libpq client. This intentionally
-   # replaces the existing Supabase public tables with the final Neon backup.
-   bash scripts/migrate-neon-to-supabase.sh --replace-existing \
-     /Users/chaerim/Desktop/bookmate-migration-backups
-   bash scripts/verify-neon-to-supabase.sh
-   ```
-
-   Use `--replace-existing` only during the planned cutover window after
-   Render has stopped accepting public writes. The script creates a fresh local
-   Neon rollback backup before it changes Supabase.
-
-   After the verification passes, point Cloudflare `api.bookmate.kr` at the
-   Mini PC and check:
-
-   ```sh
-   curl https://api.bookmate.kr/health
-   ```
-
-Keep Render and the Neon backup until the production API has been stable for a
-few days. If `R2_ENABLED=false`, new profile images are stored in the named
-`bookmate-production_profile_images` Docker volume. Existing profile images
-hosted only on Render must be copied before cancelling Render.
+공개용 저장소는 코드·테스트·설정 예시를 제공. 실제 비밀값, 운영 로그, DB 이전 스크립트와 운영 배포용 워크플로는 비공개 개발 저장소에서 관리.
