@@ -55,6 +55,6 @@ Firebase Admin SDK의 권한은 서버 서비스 계정 IAM으로 관리. Firest
 
 `X-Forwarded-For` 등 클라이언트가 임의로 보낸 헤더를 그대로 IP 기준으로 신뢰하면 안 됨. 실제 프록시 경로와 신뢰할 프록시 설정을 먼저 확인. CORS는 브라우저 정책이므로 iOS 앱이나 직접 API 호출의 접근 제어를 대신하지 못함.
 
-관련 자료: [Firebase API 키](https://firebase.google.com/docs/projects/api-keys), [OWASP 인증](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html), [OWASP 파일 업로드](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html), [Kakao REST API](https://developers.kakao.com/docs/ko/kakaologin/rest-api), [Spring HandlerInterceptor](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/servlet/HandlerInterceptor.html).
+관련 자료: [Supabase Data API 보안](https://supabase.com/docs/guides/api/securing-your-api), [Firebase 서버 접근과 IAM](https://firebase.google.com/docs/firestore/security/rules-conditions), [Firebase API 키](https://firebase.google.com/docs/projects/api-keys), [OWASP 인증](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html), [OWASP 파일 업로드](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html), [Kakao REST API](https://developers.kakao.com/docs/ko/kakaologin/rest-api), [Spring HandlerInterceptor](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/servlet/HandlerInterceptor.html).
 
 [README](../README.md)
