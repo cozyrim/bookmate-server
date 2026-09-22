@@ -42,6 +42,8 @@ Firebase Admin SDK의 권한은 서버 서비스 계정 IAM으로 관리. Firest
 
 ## 요청 횟수 제한
 
+요청 횟수 제한은 아래 기준을 검토 중이며, 2026-09-22 보안 배포에 포함되지 않음.
+
 로그인·회원가입처럼 인증 전에도 호출되는 API는 무차별 대입과 자동 가입에 대비한 제한 필요. Cloudflare 또는 앞단 프록시에서 우선 적용하고, 여러 서버에 걸친 계정별 제한이 필요해질 때 별도 저장소 검토.
 
 | 요청 | 초기 검토값의 예시 |
@@ -54,6 +56,15 @@ Firebase Admin SDK의 권한은 서버 서비스 계정 IAM으로 관리. Firest
 숫자는 정답이 아니라 시작점. 이동통신·공용 Wi-Fi에서는 여러 사용자가 같은 IP를 사용할 수 있어 정상 사용자 차단율을 보고 조정. 제한 시 `429`와 `Retry-After` 안내. iOS API에 브라우저용 CAPTCHA HTML을 그대로 반환하면 앱이 처리하지 못할 수 있음.
 
 `X-Forwarded-For` 등 클라이언트가 임의로 보낸 헤더를 그대로 IP 기준으로 신뢰하면 안 됨. 실제 프록시 경로와 신뢰할 프록시 설정을 먼저 확인. CORS는 브라우저 정책이므로 iOS 앱이나 직접 API 호출의 접근 제어를 대신하지 못함.
+
+## 운영 적용과 검증 — 2026-09-22
+
+- 북메이트 테이블 11개의 RLS 활성화 및 `anon`·`authenticated`·`PUBLIC` 직접 접근 권한 회수. 서버의 JDBC 접근은 유지하고 실제 DB 조회 응답 확인.
+- [DB 접근 제한 SQL](../scripts/sql/20260922-server-only-db-access.sql)은 서버를 통해서만 테이블에 접근하는 구조에 맞춘 설정. 다른 프로젝트에 적용하려면 클라이언트의 Data API 사용 여부와 서버 계정 권한부터 확인.
+- 기존 테이블의 설정만 변경. 새 테이블을 추가할 때도 RLS·권한을 별도 검증해야 하며, DB 전체의 기본 권한은 변경하지 않음.
+- PostgreSQL 17 격리 환경에서 로그인·소유권·업로드·토큰 재발급 등 19개 항목 검증. 운영에서는 HTTPS 응답, 인증 없는 요청 거부, 잘못된 소셜 로그인 토큰 거부 확인.
+- 공유 서버에서 북메이트 운영 API만 교체. 기존 자격 증명·업로드 볼륨 유지, 다른 컨테이너의 재시작 없음 확인.
+- 실기기 소셜 로그인·알림 수신, Firebase·R2 자격 증명의 실제 IAM 범위는 별도 확인 대상. 위 결과만으로 모든 운영 보안 검증이 끝난 것은 아님.
 
 관련 자료: [Supabase Data API 보안](https://supabase.com/docs/guides/api/securing-your-api), [Firebase 서버 접근과 IAM](https://firebase.google.com/docs/firestore/security/rules-conditions), [Firebase API 키](https://firebase.google.com/docs/projects/api-keys), [OWASP 인증](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html), [OWASP 파일 업로드](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html), [Kakao REST API](https://developers.kakao.com/docs/ko/kakaologin/rest-api), [Spring HandlerInterceptor](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/servlet/HandlerInterceptor.html).
 

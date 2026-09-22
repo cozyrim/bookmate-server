@@ -21,10 +21,17 @@ access token 만료마다 사용자가 다시 로그인해야 하는 흐름을 �
 
 - 단위 테스트에서 정상 토큰 교체와 미등록 토큰 거부 확인.
 - access token 변조·만료·잘못된 서명키 거부 테스트 포함.
-- DB 잠금 경쟁과 토큰 회전의 통합 검증은 실제 PostgreSQL에서 별도로 필요. H2 테스트 결과만으로 운영 DB의 동시성까지 보장하지 않음.
+- PostgreSQL 17 격리 환경에서 같은 refresh token으로 동시 요청 2개 전송. 한 요청만 성공(`200`), 다른 요청은 거부(`401`)됨을 확인. 모든 부하·장애 상황을 검증한 결과는 아님.
 - 사용자별 토큰 한 개이므로 다른 기기에서 로그인하면 이전 기기의 refresh token 대체.
 - 현재 로그아웃 API는 서버 토큰 폐기를 수행하지 않음. access token은 만료 전까지, refresh token은 교체·만료 전까지 유효할 수 있으므로 서버 로그아웃 폐기는 후속 보완 대상.
 - JWT 발급 구조와 기존 만료 시간은 유지. 수명 단축이나 세션 테이블 도입은 운영 정책과 함께 검토할 항목.
+
+## 기존 운영 DB에 적용
+
+- [컬럼 추가 SQL](../scripts/sql/20260922-refresh-columns.sql): nullable 컬럼 2개와 고유 인덱스 추가. 기존 사용자 데이터 수정 없음.
+- 운영 DB의 구조만 복제한 PostgreSQL 17에서 SQL 재실행과 새 서버의 스키마 검증 확인. 사용자 데이터는 복제하지 않음.
+- 운영은 `SPRING_JPA_HIBERNATE_DDL_AUTO=validate`로 실행. 스키마 변경은 별도 SQL로 적용.
+- API를 이전 이미지로 복구해도 추가한 컬럼은 유지. 기존 버전은 해당 컬럼을 사용하지 않음.
 
 관련 코드: [TokenService](../src/main/java/com/exercise/bookmateserver/auth/TokenService.java), [AuthService](../src/main/java/com/exercise/bookmateserver/auth/AuthService.java), [UserRepository](../src/main/java/com/exercise/bookmateserver/user/UserRepository.java).
 
