@@ -31,7 +31,7 @@ sequenceDiagram
 
 개인 노션 「방명록 전송버튼 개선」의 당시 실기기 측정 기록 확인. iOS 낙관적 갱신과 서버 FCM 비동기화를 함께 적용한 전후 각각 22회 결과에서 API 구간 p50은 735ms → 141.20ms(80.8% 감소), p95는 1,280ms → 235.52ms(81.6% 감소).
 
-클라이언트 `os_signpost` 구간이므로 서버 단독 실행 시간이나 FCM 비동기화만의 기여율은 아님. [iOS 문서의 전체 표와 측정 범위](https://github.com/cozyrim/bookmate-ios-public/blob/main/docs/guestbook-send-performance.md) 참고.
+클라이언트 `os_signpost` 구간이므로 서버 단독 실행 시간이나 FCM 비동기화만의 기여율은 아님. [iOS 문서의 전체 표와 측정 범위](https://github.com/cozyrim/bookmate-ios/blob/main/docs/guestbook-send-performance.md) 참고.
 
 저장 응답에서 외부 작업을 분리할 때는 실행 시점도 함께 정할 필요. `afterCommit`은 저장 확정 이후의 발송 순서를 정하지만 전달 자체를 보장하지는 않음.
 

@@ -4,7 +4,7 @@
 
 책에서 찾은 단어와 문장을 책 단위로 저장하는 앱의 백엔드. 개인 기록은 작성자에게만 제공하고, 공개 책장과 리뷰는 공개·차단·신고 상태에 따라 구분.
 
-[iOS 앱 코드](https://github.com/cozyrim/bookmate-ios-public) · [개발 환경 설정](docs/setup.md) · [인증과 운영 보안 기준](docs/auth-and-access.md)
+[iOS 앱 코드](https://github.com/cozyrim/bookmate-ios) · [개발 환경 설정](docs/setup.md) · [인증과 운영 보안 기준](docs/auth-and-access.md)
 
 ## 주요 기능
 
@@ -78,4 +78,4 @@ flowchart LR
 
 검증 대상은 토큰 생성·만료·변조, refresh token 교체, 소셜 로그인 정보, 메모 소유권, 이미지 형식·크기. 실제 PostgreSQL 동시 요청, 운영 프록시 제한, 실기기 로그인·알림은 별도 통합 검증 대상.
 
-공개용 저장소는 코드·테스트·설정 예시를 제공. 실제 비밀값, 운영 로그, DB 이전 스크립트와 운영 배포용 워크플로는 비공개 개발 저장소에서 관리.
+이 저장소에서 코드·테스트·기술 문서를 관리. 실제 비밀값과 운영 데이터는 Git에 포함하지 않으며, 기존 운영 자료는 비공개 백업에 보관. GitHub Actions는 테스트만 실행하고 미니 PC 배포는 별도로 관리.
