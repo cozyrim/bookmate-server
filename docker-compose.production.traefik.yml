@@ -14,6 +14,34 @@ services:
       - "traefik.http.routers.bookmate-production.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-myresolver}"
       - "traefik.http.services.bookmate-production.loadbalancer.server.port=8080"
 
+      # Direct client -> Traefik: use the TCP peer, never a client-supplied IP header.
+      # Revisit this strategy before enabling a CDN or another reverse proxy.
+      - "traefik.http.middlewares.bookmate-production-login-limit.ratelimit.average=30"
+      - "traefik.http.middlewares.bookmate-production-login-limit.ratelimit.period=1m"
+      - "traefik.http.middlewares.bookmate-production-login-limit.ratelimit.burst=20"
+      - "traefik.http.middlewares.bookmate-production-login-limit.ratelimit.sourcecriterion.ipstrategy.ipv6subnet=64"
+      - "traefik.http.middlewares.bookmate-production-signup-limit.ratelimit.average=10"
+      - "traefik.http.middlewares.bookmate-production-signup-limit.ratelimit.period=10m"
+      - "traefik.http.middlewares.bookmate-production-signup-limit.ratelimit.burst=5"
+      - "traefik.http.middlewares.bookmate-production-signup-limit.ratelimit.sourcecriterion.ipstrategy.ipv6subnet=64"
+
+      # Prefix matching also covers trailing slashes and servlet matrix parameters.
+      # Refresh is excluded: released clients may clear their session on any 4xx.
+      - "traefik.http.routers.bookmate-production-login.priority=110"
+      - "traefik.http.routers.bookmate-production-login.entrypoints=websecure"
+      - "traefik.http.routers.bookmate-production-login.rule=Host(`${PRODUCTION_DOMAIN}`) && (PathPrefix(`/api/auth/login`) || PathPrefix(`/api/auth/kakao`) || PathPrefix(`/api/auth/apple`))"
+      - "traefik.http.routers.bookmate-production-login.service=bookmate-production"
+      - "traefik.http.routers.bookmate-production-login.middlewares=bookmate-production-login-limit"
+      - "traefik.http.routers.bookmate-production-login.tls=true"
+      - "traefik.http.routers.bookmate-production-login.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-myresolver}"
+      - "traefik.http.routers.bookmate-production-signup.priority=110"
+      - "traefik.http.routers.bookmate-production-signup.entrypoints=websecure"
+      - "traefik.http.routers.bookmate-production-signup.rule=Host(`${PRODUCTION_DOMAIN}`) && PathPrefix(`/api/auth/signup`)"
+      - "traefik.http.routers.bookmate-production-signup.service=bookmate-production"
+      - "traefik.http.routers.bookmate-production-signup.middlewares=bookmate-production-signup-limit"
+      - "traefik.http.routers.bookmate-production-signup.tls=true"
+      - "traefik.http.routers.bookmate-production-signup.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-myresolver}"
+
 networks:
   traefik_public_network:
     external: true

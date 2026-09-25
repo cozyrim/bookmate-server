@@ -42,20 +42,24 @@ Firebase Admin SDK의 권한은 서버 서비스 계정 IAM으로 관리. Firest
 
 ## 요청 횟수 제한
 
-요청 횟수 제한은 아래 기준을 검토 중이며, 2026-09-22 보안 배포에 포함되지 않음.
+2026-09-25 운영 Traefik에 로그인·회원가입 제한 적용. 애플리케이션 코드를 추가하지 않고 북메이트 라우터와 미들웨어만 설정.
 
-로그인·회원가입처럼 인증 전에도 호출되는 API는 무차별 대입과 자동 가입에 대비한 제한 필요. Cloudflare 또는 앞단 프록시에서 우선 적용하고, 여러 서버에 걸친 계정별 제한이 필요해질 때 별도 저장소 검토.
+| 요청 | IP별 충전 속도 | 한 번에 허용하는 최대 요청 수 |
+| --- | --- | --- |
+| 이메일·카카오·Apple 로그인 합산 | 분당 30회 | 20회 |
+| 회원가입 | 10분당 10회 | 5회 |
 
-| 요청 | 초기 검토값의 예시 |
-| --- | --- |
-| 로그인 | IP당 분당 30회, 계정별 연속 실패는 지연·추가 확인 적용 |
-| 회원가입 | IP당 10분에 10회 |
-| refresh | 일반 읽기보다 낮은 별도 한도. 동시 화면 요청이 공유하는 갱신 흐름 고려 |
-| 이미지·방명록 작성 | 사용자별 생성·저장량과 분당 요청 수 제한 |
+토큰 버킷 방식으로 여유분을 소진하면 `429`와 `Retry-After` 반환. 고정된 1분 구간의 총 요청 수를 30회로 제한하는 방식은 아님. IPv6는 `/64` 단위로 묶어 주소 변경을 통한 우회 범위 축소.
 
-숫자는 정답이 아니라 시작점. 이동통신·공용 Wi-Fi에서는 여러 사용자가 같은 IP를 사용할 수 있어 정상 사용자 차단율을 보고 조정. 제한 시 `429`와 `Retry-After` 안내. iOS API에 브라우저용 CAPTCHA HTML을 그대로 반환하면 앱이 처리하지 못할 수 있음.
+- **판단**: 로그인 전 호출에도 제한이 필요하지만, 이미 출시한 앱의 정상 세션을 끊지 않는 것이 우선.
+- **해결 과정**: 직접 연결된 클라이언트 IP를 기준으로 제한. 임의의 `X-Forwarded-For`·`X-Real-IP`·`CF-Connecting-IP`는 기준으로 사용하지 않음. 경로 뒤 슬래시·세미콜론 변형도 로그인 제한에 포함.
+- **결과 및 배운 점**: 격리 프록시 검증 20개, 운영 검증 9개 통과. 횟수 제한뿐 아니라 우회 가능성과 기존 앱의 오류 응답 해석까지 함께 확인할 필요.
 
-`X-Forwarded-For` 등 클라이언트가 임의로 보낸 헤더를 그대로 IP 기준으로 신뢰하면 안 됨. 실제 프록시 경로와 신뢰할 프록시 설정을 먼저 확인. CORS는 브라우저 정책이므로 iOS 앱이나 직접 API 호출의 접근 제어를 대신하지 못함.
+출시된 iOS 앱은 토큰 갱신의 모든 `4xx`를 인증 실패로 간주하므로 **refresh는 이번 제한에서 제외**. 클라이언트가 `429`를 재시도 가능한 오류로 구분하도록 수정·배포한 뒤 별도 제한 검토. 일반 책·메모 요청과 상태 확인 경로도 이번 제한 대상에서 제외.
+
+현재 클라이언트가 Traefik에 직접 연결되는 경로를 기준으로 설정. CDN이나 프록시를 추가하면 실제 사용자 IP 전달 방식과 신뢰 범위 재검토 필요. 이동통신·공용 Wi-Fi의 정상 사용자 차단율을 보고 수치 조정. 계정별 로그인 실패 제한과 사용자별 업로드·작성량 제한은 별도 개선 대상.
+
+CORS는 브라우저 정책이므로 iOS 앱이나 직접 API 호출의 접근 제어를 대신하지 못함.
 
 ## 운영 적용과 검증 — 2026-09-22
 
@@ -64,8 +68,21 @@ Firebase Admin SDK의 권한은 서버 서비스 계정 IAM으로 관리. Firest
 - 기존 테이블의 설정만 변경. 새 테이블을 추가할 때도 RLS·권한을 별도 검증해야 하며, DB 전체의 기본 권한은 변경하지 않음.
 - PostgreSQL 17 격리 환경에서 로그인·소유권·업로드·토큰 재발급 등 19개 항목 검증. 운영에서는 HTTPS 응답, 인증 없는 요청 거부, 잘못된 소셜 로그인 토큰 거부 확인.
 - 공유 서버에서 북메이트 운영 API만 교체. 기존 자격 증명·업로드 볼륨 유지, 다른 컨테이너의 재시작 없음 확인.
-- 실기기 소셜 로그인·알림 수신, Firebase·R2 자격 증명의 실제 IAM 범위는 별도 확인 대상. 위 결과만으로 모든 운영 보안 검증이 끝난 것은 아님.
+- 배포 후 사용자가 실기기 카카오 로그인과 책·메모 저장 정상 동작 확인. Apple 로그인과 실제 푸시 수신은 추가 확인 대상.
 
-관련 자료: [Supabase Data API 보안](https://supabase.com/docs/guides/api/securing-your-api), [Firebase 서버 접근과 IAM](https://firebase.google.com/docs/firestore/security/rules-conditions), [Firebase API 키](https://firebase.google.com/docs/projects/api-keys), [OWASP 인증](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html), [OWASP 파일 업로드](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html), [Kakao REST API](https://developers.kakao.com/docs/ko/kakaologin/rest-api), [Spring HandlerInterceptor](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/servlet/HandlerInterceptor.html).
+## 운영 권한 점검 — 2026-09-25
+
+| 대상 | 적용·확인 내용 | 검증 범위 |
+| --- | --- | --- |
+| Firebase 서버 계정 | 기존 Admin SDK 관리자·서비스 계정 토큰 생성자 역할을 FCM API 관리자 역할로 축소 | 운영 자격 증명으로 FCM `validate_only` 성공. 점검한 데이터 삭제·사용자 수정·계정 토큰 생성 권한 없음 확인 |
+| Firebase iOS API 키 | 북메이트 Bundle Identifier로 앱 제한 추가, 기존 API 허용 목록 유지 | 실제 앱 구성의 키로 올바른 식별자 200·다른 식별자 403 확인. 검증용 설치 등록은 즉시 삭제 |
+| R2 | 운영 프로필 이미지 버킷 하나의 객체 읽기·쓰기 권한 유지 | 콘솔 정책과 운영 Access Key ID 대조. 키 교체·권한 확대 없음 |
+| 운영 컨테이너 | 북메이트 API의 Traefik 설정만 변경 | 기존 이미지·환경변수·볼륨 유지. 공유 프록시와 다른 컨테이너 8개의 재시작 없음 확인 |
+
+iOS API 키 제한은 앱 식별자에 대한 사용 범위 설정이며, 위조 불가능한 앱 인증을 제공하는 것은 아님. 서버 인증·소유권 검사와 IAM을 대체하지 않음.
+
+FCM 검증은 실제 알림을 보내지 않는 모드로 수행. 실제 APNs 전달과 기기 수신까지 확인한 결과는 아님. 최소 권한 설정은 키 유출 시 피해 범위를 줄이는 조치이며, 서비스 계정 키를 저장소에 공개해도 된다는 의미는 아님.
+
+관련 자료: [Traefik 요청 제한](https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/ratelimit/), [FCM 검증 모드](https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages/send), [Supabase Data API 보안](https://supabase.com/docs/guides/api/securing-your-api), [Firebase 서버 접근과 IAM](https://firebase.google.com/docs/firestore/security/rules-conditions), [Firebase API 키](https://firebase.google.com/docs/projects/api-keys), [OWASP 인증](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html), [OWASP 파일 업로드](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html), [Kakao REST API](https://developers.kakao.com/docs/ko/kakaologin/rest-api), [Spring HandlerInterceptor](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/servlet/HandlerInterceptor.html).
 
 [README](../README.md)
