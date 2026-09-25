@@ -1,5 +1,7 @@
 package com.exercise.bookmateserver.readingmemo;
 
+import com.exercise.bookmateserver.ratelimit.LimitedWrite;
+
 import com.exercise.bookmateserver.auth.CurrentUserResolver;
 import com.exercise.bookmateserver.user.UserEntity;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,6 +24,7 @@ public class ReadingMemoController {
         this.currentUserResolver = currentUserResolver;
     }
 
+    @LimitedWrite(LimitedWrite.Kind.RECORD)
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ReadingMemoResponse createMemo(

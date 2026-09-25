@@ -1,5 +1,7 @@
 package com.exercise.bookmateserver.social.guestbook;
 
+import com.exercise.bookmateserver.ratelimit.LimitedWrite;
+
 import com.exercise.bookmateserver.user.UserEntity;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -26,6 +28,7 @@ public class GuestbookController {
         return guestbookService.getMessages(currentUser, userId);
     }
 
+    @LimitedWrite(LimitedWrite.Kind.GUESTBOOK)
     @PostMapping("/users/{userId}/guestbook")
     @ResponseStatus(HttpStatus.CREATED)
     public GuestbookMessageResponse writeMessage(

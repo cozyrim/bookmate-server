@@ -1,5 +1,7 @@
 package com.exercise.bookmateserver.book;
 
+import com.exercise.bookmateserver.ratelimit.LimitedWrite;
+
 import com.exercise.bookmateserver.auth.CurrentUserResolver;
 import com.exercise.bookmateserver.user.UserEntity;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,6 +34,7 @@ public class BookController {
     }
 
     @Operation(summary = "책 등록", description = "새로운 책을 등록합니다.")
+    @LimitedWrite(LimitedWrite.Kind.RECORD)
     @PostMapping("/api/books")
     @ResponseStatus(HttpStatus.CREATED)
     public BookResponse createBook(HttpServletRequest httpRequest, @Valid @RequestBody BookCreateRequest request) {

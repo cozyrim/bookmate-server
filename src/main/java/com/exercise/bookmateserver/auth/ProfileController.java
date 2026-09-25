@@ -1,5 +1,7 @@
 package com.exercise.bookmateserver.auth;
 
+import com.exercise.bookmateserver.ratelimit.LimitedWrite;
+
 import com.exercise.bookmateserver.user.ProfileResponse;
 import com.exercise.bookmateserver.user.ProfileImageStorageService;
 import com.exercise.bookmateserver.user.ProfileImageUploadResponse;
@@ -55,6 +57,7 @@ public class ProfileController {
     }
 
     @Operation(summary = "프로필 이미지 업로드", description = "로그인한 사용자의 프로필 이미지를 업로드하고 접근 가능한 이미지 URL을 반환합니다.")
+    @LimitedWrite(LimitedWrite.Kind.PROFILE_IMAGE)
     @PostMapping(value = "/api/me/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ProfileImageUploadResponse uploadProfileImage(
             HttpServletRequest request,

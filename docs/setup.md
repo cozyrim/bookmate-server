@@ -43,6 +43,10 @@ curl http://127.0.0.1:18080/health
 
 서버의 Firebase 서비스 계정 JSON은 iOS의 `GoogleService-Info.plist`와 다름. **서비스 계정 JSON에는 비밀키가 포함되므로 공개 금지.**
 
-운영용 예시는 `.env.production.example` 참고. 실제 운영 서명키를 바꾸면 기존 로그인 토큰이 무효화되므로, 공개 준비를 이유로 운영 키를 임의 변경하지 않음.
+`.env.*.example`은 설정 이름과 가짜 예시를 공개하는 템플릿. 실제 `.env.staging`·`.env.production`은 계속 Git에서 제외. 예시의 `example.com` 주소와 빈 외부 서비스 값은 본인 환경에 맞게 입력.
+
+운영용 예시는 `.env.production.example` 참고. DB는 별도 실행 역할을 만들고 [권한·작성량 테이블 SQL](../scripts/sql/20260925-runtime-role-and-write-limits.sql)을 관리 계정으로 먼저 적용. 이 SQL은 Supabase의 `anon`·`authenticated` 역할이 있는 운영 DB를 기준으로 작성. 실행 역할의 무작위 비밀번호는 Git 밖에서 설정하고 `.env.production`에만 보관. Supabase pooler의 사용자 이름은 `bookmate_runtime.<project-ref>` 형식. 운영의 `SPRING_JPA_HIBERNATE_DDL_AUTO=validate` 유지.
+
+ 실제 운영 서명키를 바꾸면 기존 로그인 토큰이 무효화되므로, 공개 준비를 이유로 운영 키를 임의 변경하지 않음.
 
 [README](../README.md)

@@ -1,5 +1,7 @@
 package com.exercise.bookmateserver.quote;
 
+import com.exercise.bookmateserver.ratelimit.LimitedWrite;
+
 import com.exercise.bookmateserver.auth.CurrentUserResolver;
 import com.exercise.bookmateserver.user.UserEntity;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,6 +34,7 @@ public class QuoteController {
     }
 
     @Operation(summary = "구절 저장", description = "특정 책의 구절을 저장합니다.")
+    @LimitedWrite(LimitedWrite.Kind.RECORD)
     @PostMapping("/api/quotes")
     @ResponseStatus(HttpStatus.CREATED)
     public QuoteResponse saveQuote(HttpServletRequest httpRequest, @Valid @RequestBody QuoteCreateRequest request) {

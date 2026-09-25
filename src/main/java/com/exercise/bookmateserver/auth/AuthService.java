@@ -259,6 +259,14 @@ public class AuthService {
         return TokenRefreshResponse.of(rotatedTokens.accessToken(), rotatedTokens.refreshToken());
     }
 
+    @Transactional
+    public void logout(RefreshTokenRequest request) {
+        // Match the credential itself: a delayed logout must not revoke a newer login.
+        userRepository.findByRefreshTokenHashAndDeletedAtIsNull(
+                tokenService.hashRefreshToken(request.refreshToken()))
+                .ifPresent(UserEntity::clearRefreshToken);
+    }
+
     public ProfileResponse getProfile(UserEntity user) {
         return createProfileResponse(user);
     }

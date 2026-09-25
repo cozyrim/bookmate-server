@@ -26,6 +26,10 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<UserEntity> findByRefreshTokenHashAndDeletedAtIsNull(String refreshTokenHash);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM UserEntity u WHERE u.id = :id AND u.deletedAt IS NULL")
+    Optional<UserEntity> findActiveByIdForUpdate(@Param("id") UUID id);
+
     @Query("SELECT COUNT(user) FROM UserEntity user WHERE user.deletedAt IS NULL")
     long countByDeletedAtIsNull();
 

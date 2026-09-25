@@ -70,9 +70,10 @@ public class AuthController {
         return authService.refresh(request);
     }
 
-    @Operation(summary = "로그아웃", description = "클라이언트에서 Keychain 토큰을 삭제하면 로그아웃됩니다.")
+    @Operation(summary = "로그아웃", description = "전달한 refresh token을 폐기합니다. 이미 폐기된 토큰도 성공으로 응답합니다.")
     @PostMapping("/api/auth/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void logout() {
+    public void logout(@Valid @RequestBody(required = false) RefreshTokenRequest request) {
+        if (request != null) authService.logout(request);
     }
 }

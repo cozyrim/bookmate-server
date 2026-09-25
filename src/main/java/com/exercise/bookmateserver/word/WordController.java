@@ -1,5 +1,7 @@
 package com.exercise.bookmateserver.word;
 
+import com.exercise.bookmateserver.ratelimit.LimitedWrite;
+
 import com.exercise.bookmateserver.auth.CurrentUserResolver;
 import com.exercise.bookmateserver.user.UserEntity;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,6 +34,7 @@ public class WordController {
     }
 
     @Operation(summary = "단어 저장", description = "사전에서 검색한 단어를 특정 책에 저장합니다.")
+    @LimitedWrite(LimitedWrite.Kind.RECORD)
     @PostMapping("/api/words")
     @ResponseStatus(HttpStatus.CREATED)
     public WordResponse saveWord(HttpServletRequest httpRequest, @Valid @RequestBody WordCreateRequest request) {

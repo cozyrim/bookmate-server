@@ -55,9 +55,9 @@ Firebase Admin SDK의 권한은 서버 서비스 계정 IAM으로 관리. Firest
 - **해결 과정**: 직접 연결된 클라이언트 IP를 기준으로 제한. 임의의 `X-Forwarded-For`·`X-Real-IP`·`CF-Connecting-IP`는 기준으로 사용하지 않음. 경로 뒤 슬래시·세미콜론 변형도 로그인 제한에 포함.
 - **결과 및 배운 점**: 격리 프록시 검증 20개, 운영 검증 9개 통과. 횟수 제한뿐 아니라 우회 가능성과 기존 앱의 오류 응답 해석까지 함께 확인할 필요.
 
-출시된 iOS 앱은 토큰 갱신의 모든 `4xx`를 인증 실패로 간주하므로 **refresh는 이번 제한에서 제외**. 클라이언트가 `429`를 재시도 가능한 오류로 구분하도록 수정·배포한 뒤 별도 제한 검토. 일반 책·메모 요청과 상태 확인 경로도 이번 제한 대상에서 제외.
+출시된 iOS 앱은 토큰 갱신의 모든 `4xx`를 인증 실패로 간주하므로 **refresh는 이번 제한에서 제외**. iOS 코드는 `401`과 `429`를 구분하도록 수정했으며, App Store 버전 배포 후 별도 제한 검토. 일반 책·메모 요청과 상태 확인 경로도 이번 제한 대상에서 제외.
 
-현재 클라이언트가 Traefik에 직접 연결되는 경로를 기준으로 설정. CDN이나 프록시를 추가하면 실제 사용자 IP 전달 방식과 신뢰 범위 재검토 필요. 이동통신·공용 Wi-Fi의 정상 사용자 차단율을 보고 수치 조정. 계정별 로그인 실패 제한과 사용자별 업로드·작성량 제한은 별도 개선 대상.
+현재 클라이언트가 Traefik에 직접 연결되는 경로를 기준으로 설정. CDN이나 프록시를 추가하면 실제 사용자 IP 전달 방식과 신뢰 범위 재검토 필요. 이동통신·공용 Wi-Fi의 정상 사용자 차단율을 보고 수치 조정. 계정별 로그인 실패 제한은 별도 개선 대상. 사용자별 업로드·작성량 제한은 아래와 같이 추가.
 
 CORS는 브라우저 정책이므로 iOS 앱이나 직접 API 호출의 접근 제어를 대신하지 못함.
 
@@ -82,6 +82,24 @@ CORS는 브라우저 정책이므로 iOS 앱이나 직접 API 호출의 접근 �
 iOS API 키 제한은 앱 식별자에 대한 사용 범위 설정이며, 위조 불가능한 앱 인증을 제공하는 것은 아님. 서버 인증·소유권 검사와 IAM을 대체하지 않음.
 
 FCM 검증은 실제 알림을 보내지 않는 모드로 수행. 실제 APNs 전달과 기기 수신까지 확인한 결과는 아님. 최소 권한 설정은 키 유출 시 피해 범위를 줄이는 조치이며, 서비스 계정 키를 저장소에 공개해도 된다는 의미는 아님.
+
+## 사용자별 작성량·DB 실행 권한 — 2026-09-25 적용
+
+| 대상 | 사용자별 1분 한도 | 사용자별 하루 한도 |
+| --- | --- | --- |
+| 프로필 이미지 업로드 | 3회 | 20회 |
+| 방명록 작성 | 10회 | 100회 |
+| 책·단어·문장·독서 메모 생성 합산 | 60회 | 1,000회 |
+
+- 인증된 사용자 ID 기준. IP 변경이나 API 재시작으로 초기화되지 않도록 DB에 저장.
+- 사용자 행을 짧게 잠가 동시 요청의 첫 카운터 생성·증가를 직렬화. 기존 PostgreSQL을 사용하고 Redis 등 별도 운영 구성은 추가하지 않음.
+- UTC 기준 고정 분·일 구간 사용. 경계 전후에는 두 구간의 한도를 연속 사용할 수 있음. 전체 보관 용량 제한이나 과거 이미지 정리 정책은 아님.
+- 제한 시 `429`·`Retry-After` 반환. 허용된 시도는 이후 입력 검증이나 저장 실패가 나도 한도에 포함. 조회·삭제·기기 토큰 등록·알림 읽기는 제외.
+- 새 `user_write_limits` 테이블과 권한은 [SQL](../scripts/sql/20260925-runtime-role-and-write-limits.sql)로 적용. 카운터는 사용자·작업 종류·시간 구간별 행을 갱신하므로 요청마다 행이 늘어나지 않음.
+- DB 실행 계정은 북메이트 12개 테이블의 SELECT·INSERT·UPDATE·DELETE만 명시적으로 부여. 테이블 소유권·스키마 생성·역할 생성·RLS 우회 권한 없음. 서버 계정 전용 RLS 정책을 사용하고 `anon`·`authenticated` 접근 차단 유지.
+- 개별 사용자 기록의 소유권은 서버가 검사. 서버 계정의 RLS 정책이 사용자별 소유권 검사를 대신하지 않음. 새 테이블·스키마 변경은 별도 관리 계정으로 적용하고 실행 서버는 `ddl-auto=validate` 유지.
+
+서버 테스트 26개, 전용 실행 역할을 사용한 PostgreSQL 17 격리 API 검증 33개, 운영 확인 11개 통과. 운영에서는 실제 계정을 생성하거나 사용자 기록을 수정하지 않음. 북메이트 API만 교체했으며 다른 서비스 8개는 유지.
 
 관련 자료: [Traefik 요청 제한](https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/ratelimit/), [FCM 검증 모드](https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages/send), [Supabase Data API 보안](https://supabase.com/docs/guides/api/securing-your-api), [Firebase 서버 접근과 IAM](https://firebase.google.com/docs/firestore/security/rules-conditions), [Firebase API 키](https://firebase.google.com/docs/projects/api-keys), [OWASP 인증](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html), [OWASP 파일 업로드](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html), [Kakao REST API](https://developers.kakao.com/docs/ko/kakaologin/rest-api), [Spring HandlerInterceptor](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/servlet/HandlerInterceptor.html).
 

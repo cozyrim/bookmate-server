@@ -1,8 +1,9 @@
 package com.exercise.bookmateserver.auth;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 public record RefreshTokenRequest(
-        @NotBlank String refreshToken
+        @NotBlank @Size(max = 512) String refreshToken
 ) {
 }
