@@ -33,6 +33,7 @@ curl http://127.0.0.1:18080/health
 | 설정 | 용도 |
 | --- | --- |
 | `JWT_SECRET` | 북메이트 access token 서명. 누락·짧은 키·예시 값은 시작 시 거부 |
+| `YES24_API_KEY` | 서버 전용 YES24 키. 실시간 국내도서 베스트셀러, 60초 공유 캐시. 앱/저장소에 포함하지 않음 |
 | `KAKAO_APP_ID` | 카카오 토큰이 북메이트 앱에서 발급됐는지 확인 |
 | `APPLE_CLIENT_ID` | Apple identity token의 audience와 비교할 iOS Bundle Identifier |
 | `FCM_ENABLED` | FCM 사용 여부. 사용 시 서비스 계정 설정 필요 |
