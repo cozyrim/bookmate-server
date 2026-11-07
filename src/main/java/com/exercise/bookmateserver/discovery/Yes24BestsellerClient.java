@@ -61,9 +61,28 @@ public class Yes24BestsellerClient {
             result.add(new BestsellerResponse.Item(rank, id, item.path("title").asText(""),
                     item.path("author").asText(""), item.path("publisher").asText(""),
                     item.path("isbn13").asText(""), cover, "https://www.yes24.com/product/goods/" + id,
-                    pages > 0 ? pages : null));
+                    pages > 0 ? pages : null, introduction(item.path("contentDetail"))));
         }
         return result.stream().sorted(java.util.Comparator.comparingInt(BestsellerResponse.Item::rank)).limit(20).toList();
+    }
+
+    static String introduction(JsonNode detail) {
+        String value = plainText(detail.path("bookIntroduction").asText(""));
+        return value.isBlank() ? plainText(detail.path("bookSummary").asText("")) : value;
+    }
+
+    private static String plainText(String html) {
+        // Render provider copy as text only: no remote images, scripts, or web view.
+        String bounded = html.length() > 100_000 ? html.substring(0, 100_000) : html;
+        String text = bounded
+                .replaceAll("(?is)<(script|style)\\b[^>]*>.*?</\\1\\s*>", "")
+                .replaceAll("(?i)<br\\b[^>]*>|</?(?:p|div|li|h[1-6])\\b[^>]*>", "\n")
+                .replaceAll("(?s)<[a-zA-Z/!][^>]*>", "");
+        return org.springframework.web.util.HtmlUtils.htmlUnescape(text)
+                .replace('\u00a0', ' ')
+                .replace("\r\n", "\n")
+                .replaceAll("[ \t]+\n", "\n")
+                .replaceAll("\n{3,}", "\n\n").trim();
     }
 
     static ResponseStatusException unavailable() {
